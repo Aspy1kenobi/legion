@@ -143,34 +143,33 @@ cat src/legion/world_model.py
 _This section is updated by the Primary at the end of each session. Replace it
 entirely with the new block before handing off to the researcher._
 
-**Next Target:** First live run of run_loop.py — verify end-to-end:
-world_model loads → goal seeded → planner claims and executes →
-consensus evaluates → belief committed.
+Next Target: Implement goal decomposition for the architecture analysis goal. Replace the single seeded goal in run_loop.py with two sequential child goals:
 
-**Completed:**
-- [x] world_model.py — built, reviewed, patched (NodeRecord.status,
-      update_goal_status clear_assignment)
-- [x] llm_client.py — reviewed; call_llm() is the abstraction layer
-- [x] agent_memory.py — reviewed; superseded by SharedWorldModel for Legion
-- [x] agents.py — reviewed; retired for Legion nodes
-- [x] prompts.py — reviewed; build_messages() pattern carried forward
-- [x] goal_stack.py — built; pure interface over wm.goals, no local state
-- [x] dispatcher.py — built; LegionNode dataclass + claim/execute/release cycle
-- [x] consensus.py — built; challenge/accept with structured JSON verdict,
-      malformed fallback, retry tracking, escalation after max_retries
-- [x] run_loop.py — built; fixed interval + adaptive sleep, consensus
-      post-dispatch pass, signal handling, max_ticks guard
+"analyze Legion architecture to identify the most critical missing capability for autonomous goal pursuit" — routes to planner via "analyze" keyword
+"design integration plan for Legion's most critical missing capability for autonomous goal pursuit" — routes to planner via "plan" keyword, depends_on goal 1
 
-**Pending:**
-- [ ] First live run + debug
-- [ ] can_handle() keyword matching may need tuning after first run
-- [ ] LLM-driven goal decomposition (Planner calls decompose() autonomously)
-- [ ] Engineer node (procedural, capabilities: implement/code/test/build)
-- [ ] Ethicist node (evaluative, add to ConsensusEngine evaluator pool)
+This exercises GoalStack.decompose() for the first time and resolves the skeptic overreach issue from the current run. The gap_can_handle_keyword belief confirmed keyword matching matters — child descriptions must contain planner capability keywords explicitly.
+Completed this session:
 
-**Open Questions / Blockers:**
-- can_handle() keyword match is fragile for novel goal descriptions —
-  monitor first run, may need capability list expansion or fuzzy match
-- No test harness yet — first run is also first integration test
+ First live run — end-to-end pipeline confirmed working
+ Diagnosed planner grounding failure — empty world model on first run
+ Implemented bootstrap_beliefs() — 27 atomic beliefs seeded from kickoff doc
+ Diagnosed and fixed nested asyncio lock deadlock in world_model.py — _save_unlocked() pattern applied to all four write methods
+ Tracked down missing import/call for bootstrap in run_loop.py
+ Confirmed bootstrap working — 27 beliefs persisting to disk
+ Confirmed skeptic rejection reason has changed — planner now grounded in Legion architecture
 
-**Last Query to Research Resource:** None this session.
+Pending:
+
+ Implement decomposed goal seeding (next target above)
+ Remove debug prints from bootstrap_beliefs.py once decomposition confirmed working
+ Engineer node (procedural, capabilities: implement/code/test/build)
+ Ethicist node (evaluative, add to ConsensusEngine evaluator pool)
+ LLM-driven goal decomposition (Planner calls decompose() autonomously)
+
+Open Questions / Blockers:
+
+can_handle() keyword matching confirmed fragile — child goal descriptions must be authored carefully. Fuzzy match or embedding-based routing is the long-term fix.
+max_retries=2 may be too low for complex goals — monitor next run.
+
+Last Query to Research Resource: None this session.

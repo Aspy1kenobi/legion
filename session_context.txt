@@ -1,0 +1,3004 @@
+=== REPO STRUCTURE ===
+./src/agent_memory.py
+./src/agents.py
+./src/config.py
+./src/legion/__init__.py
+./src/legion/agents_legion.py
+./src/legion/bootstrap_beliefs.py
+./src/legion/consensus.py
+./src/legion/dispatcher.py
+./src/legion/goal_stack.py
+./src/legion/run_loop.py
+./src/legion/world_model.py
+./src/llm_bridge.py
+./src/llm_client.py
+./src/memory.py
+./src/prompts.py
+
+=== KEY CONFIG ===
+# Copy this template to .env and modify as needed.
+# Model Configuration
+MODEL=llama3.2:3b
+API_BASE_URL=http://localhost:11434
+
+# Generation Parameters
+TEMPERATURE=0.7
+MAX_TOKENS=1024
+TIMEOUT=30.0
+
+# Experiment Tracking
+PHASE=phase1
+
+# API Keys (required for Phase 4+)
+# Get your API key from: https://console.anthropic.com/
+ANTHROPIC_API_KEY=your-anthropic-api-key-here
+
+# Get your API key from: https://platform.openai.com/api-keys
+OPENAI_API_KEY=your-openai-api-key-here
+=== ./src/agent_memory.py ===
+"""
+Per-agent memory stream for Phase 2 debate experiments.
+Implements the Generative Agents retrieval formula:
+    score = recency + importance + relevance
+All three components normalized to [0, 1] before summing.
+
+Intentionally minimal — no disk I/O, no tags, no export.
+Each AgentMemory instance lives for one experiment run only.
+"""
+
+import re
+import numpy as np
+from datetime import datetime
+from dataclasses import dataclass, field
+
+
+@dataclass
+class MemoryEntry:
+    text: str
+    timestamp: datetime = field(default_factory=datetime.now)
+    importance: float = 1.0
+
+
+class AgentMemory:
+    """
+    Ephemeral memory stream for a single debate agent.
+    Accumulates responses across rounds and retrieves relevant
+    entries using recency + importance + relevance scoring.
+    """
+
+    def __init__(self, agent_name: str, decay: float = 0.01):
+        self.agent_name = agent_name
+        self.decay = decay
+        self.entries: list[MemoryEntry] = []
+
+    def add(self, text: str, importance: float = 1.0) -> None:
+        """Add a new memory entry."""
+        self.entries.append(MemoryEntry(text=text, importance=importance))
+
+    def retrieve(self, query: str, top_k: int = 3) -> list[MemoryEntry]:
+        """
+        Return top-k entries scored by recency + importance + relevance.
+        Returns empty list if memory is empty or top_k is 0.
+        """
+        if not self.entries or top_k == 0:
+            return []
+
+        n = len(self.entries)
+        query_words = set(re.findall(r'\b\w+\b', query.lower()))
+
+        # ── 1. Recency ────────────────────────────────────────────
+        now = datetime.now()
+        hours_elapsed = np.array([
+            (now - e.timestamp).total_seconds() / 3600
+            for e in self.entries
+        ])
+        recency_scores = np.exp(-self.decay * hours_elapsed)
+
+        # ── 2. Importance ─────────────────────────────────────────
+        importance_scores = np.array([e.importance for e in self.entries])
+        max_imp = importance_scores.max()
+        if max_imp > 0:
+            importance_scores = importance_scores / max_imp
+
+        # ── 3. Relevance ──────────────────────────────────────────
+        raw_relevance = np.array([
+            len(set(re.findall(r'\b\w+\b', e.text.lower())) & query_words)
+            for e in self.entries
+        ])
+        max_rel = raw_relevance.max()
+        relevance_scores = raw_relevance / max_rel if max_rel > 0 else np.zeros(n)
+
+        # ── 4. Combine and rank ───────────────────────────────────
+        combined = recency_scores + importance_scores + relevance_scores
+        top_indices = combined.argsort()[::-1][:top_k]
+
+        return [self.entries[i] for i in top_indices]
+
+    def build_context(self, query: str, top_k: int = 3) -> str:
+        """
+        Retrieve top-k memories and format them as a context string
+        for injection into the agent's prompt.
+        Returns empty string if memory is empty.
+        """
+        memories = self.retrieve(query, top_k)
+        if not memories:
+            return ""
+
+        lines = [f"[Memory {i+1}] {m.text}" for i, m in enumerate(memories)]
+        return "\n".join(lines)
+
+    def __len__(self) -> int:
+        return len(self.entries)
+=== ./src/agents.py ===
+from datetime import datetime
+import logging
+logger = logging.getLogger(__name__)
+
+def log_call(func):
+    def wrapper(*args, **kwargs):
+        logger.debug("[%s] called with: %s %s", func.__name__, args, kwargs)
+        return func(*args, **kwargs)
+    return wrapper
+
+@log_call
+def agent_planner(topic: str, context: str = "") -> str:
+    output = (
+        f"[Planner]\n"
+        f"Goal: Make progress on: {topic}\n"
+    )
+
+    if context:
+        output += f"\nConsidering your recent activity:{context}\n"
+
+    output += (
+        f"Plan:\n"
+        f"1) Define what success looks like\n"
+        f"2) List constraints and resources\n"
+        f"3) Break into 3 small tasks\n"
+        f"4) Choose the next action you can do in 15 minutes\n"
+    )
+    return output
+
+
+@log_call
+def agent_engineer(topic: str, context: str = "") -> str:
+    output = f"[Engineer]\n"
+
+    if context:
+        output += f"Looking at what you've been working on:{context}\n"
+        
+    output += (
+        f"Implementation ideas for: {topic}\n"
+        f"- Start with a minimal prototype\n"
+        f"- Add logging + tests early\n"
+        f"- Keep modules small and readable\n"
+    )
+    return output
+
+
+@log_call
+def agent_skeptic(topic: str, context: str = "") -> str:
+    output = f"[Skeptic]\n"
+
+    if context:
+        output += f"Based on your notes:{context}\n"
+
+    output += (
+        f"Questions / risks about: {topic}\n"
+        f"- What assumptions might be wrong?\n"
+        f"- What could fail silently?\n"
+        f"- How do we know it works?\n"
+    )
+    return output
+
+
+@log_call
+def agent_ethicist(topic: str, context: str = "") -> str:
+    output = f"[ethicist]\n"
+    
+    if context:
+        output += f"What precedent does this set: {context}\n"
+
+    output +=(
+        f"Safety / ethics check for: {topic}\n"
+        f"- Does this increase harm or risk?\n"
+        f"- Are there privacy issues?\n"
+        f"- Can we add a human approval step?\n"
+    )
+    return output
+
+@log_call
+def agent_imagination(topic: str, context: str = "") -> str:
+    """Creative agent powered by your LLM"""
+    from llm_bridge import generate_text, is_available, initialize_llm
+
+    if not is_available():
+        return "[Imagination agent]\nLLM not available"
+    
+    initialize_llm()
+
+    #Create a prompt for the LLM based on the topic
+    prompt = f"Creative ideas about {topic}: "
+
+    # Generate
+    text = generate_text(prompt, length=200, temperature=0.8)
+
+    if text:
+        return f"[Imagination Agent - Powered by TinyLM]\n{text}"
+    else:
+        return "[Imagination Agent]\nFailed to generate ideas"
+    
+
+
+def run_lab_meeting(topic: str, context: str = "") -> str:
+    outputs = [
+        agent_planner(topic, context),
+        agent_engineer(topic, context),
+        agent_skeptic(topic, context),
+        agent_imagination(topic, context),
+        agent_ethicist(topic, context),
+    ]
+    return "\n\n".join(outputs)
+=== ./src/config.py ===
+"""
+Configuration management for the multi-agent debate system.
+Reads from environment variables with sensible defaults for local Ollama.
+"""
+
+import os
+from dataclasses import dataclass
+from typing import Optional
+from dotenv import load_dotenv
+load_dotenv()
+
+
+@dataclass
+class Config:
+    """Configuration settings for the debate system."""
+    
+    # Model configuration
+    model: str = "llama3.2:3b"
+    api_base_url: str = "http://localhost:11434"
+    
+    # Generation parameters
+    temperature: float = 0.7
+    max_tokens: int = 512
+    timeout: float = 120.0
+    
+    # Experiment tracking
+    phase: str = "phase1"
+    
+    # Optional API keys (for Phase 4+)
+    anthropic_api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    
+    @classmethod
+    def from_env(cls) -> "Config":
+        """Create a Config instance from environment variables."""
+        return cls(
+            # Model configuration
+            model=os.environ.get("MODEL", "llama3.2:3b"),
+            api_base_url=os.environ.get("API_BASE_URL", "http://localhost:11434"),
+            
+            # Generation parameters
+            temperature=float(os.environ.get("TEMPERATURE", "0.7")),
+            max_tokens=int(os.environ.get("MAX_TOKENS", "1024")),
+            timeout=float(os.environ.get("TIMEOUT", "30.0")),
+            
+            # Experiment tracking
+            phase=os.environ.get("PHASE", "phase1"),
+            
+            # API keys (optional)
+            anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY"),
+            openai_api_key=os.environ.get("OPENAI_API_KEY"),
+        )
+    
+    def __post_init__(self):
+        """Validate configuration values."""
+        if not 0.0 <= self.temperature <= 2.0:
+            raise ValueError(f"Temperature must be between 0.0 and 2.0, got {self.temperature}")
+        
+        if self.max_tokens < 1:
+            raise ValueError(f"max_tokens must be positive, got {self.max_tokens}")
+        
+        if self.timeout <= 0:
+            raise ValueError(f"timeout must be positive, got {self.timeout}")
+    
+    def safe_summary(self) -> str:
+        """
+        Return a human-readable summary of the configuration with API keys redacted.
+        Safe for logging without exposing secrets.
+        """
+        lines = [
+            "Configuration Summary:",
+            f"  Model: {self.model}",
+            f"  API Base URL: {self.api_base_url}",
+            f"  Temperature: {self.temperature}",
+            f"  Max Tokens: {self.max_tokens}",
+            f"  Timeout: {self.timeout}s",
+            f"  Phase: {self.phase}",
+            f"  Anthropic API Key: {self._redact_key(self.anthropic_api_key)}",
+            f"  OpenAI API Key: {self._redact_key(self.openai_api_key)}",
+        ]
+        return "\n".join(lines)
+    
+    def _redact_key(self, key: Optional[str]) -> str:
+        """Redact an API key for safe logging."""
+        if not key:
+            return "[not set]"
+        if len(key) <= 8:
+            return "********"  # Too short to show anything
+        # Show first 4 and last 4 characters
+        return f"{key[:4]}...{key[-4:]}"
+    
+    def __str__(self) -> str:
+        """
+        String representation (uses safe_summary to avoid exposing keys).
+        This makes print(config) safe by default.
+        """
+        return self.safe_summary()
+
+
+# Create a global config instance for easy import
+config = Config.from_env()
+=== ./src/legion/__init__.py ===
+
+=== ./src/legion/agents_legion.py ===
+# placeholder
+
+=== ./src/legion/bootstrap_beliefs.py ===
+async def bootstrap_beliefs(wm: "SharedWorldModel") -> int:
+    """
+    Seed the world model with Legion's known architecture, experimental
+    findings, constraints, and gaps before the first tick.
+
+    Called once during RunLoop.startup() after wm.load(). Safe to call
+    on subsequent runs — add_belief() updates existing beliefs in place,
+    so re-running does not duplicate entries.
+
+    Returns the number of beliefs written.
+    """
+    beliefs = [
+
+        # ── Build status ──────────────────────────────────────────────────────
+        ("module_world_model_built",
+         "world_model.py is built and operational.",
+         1.0),
+
+        ("module_goal_stack_built",
+         "goal_stack.py is built and operational.",
+         1.0),
+
+        ("module_dispatcher_built",
+         "dispatcher.py is built and operational.",
+         1.0),
+
+        ("module_consensus_built",
+         "consensus.py is built and operational.",
+         1.0),
+
+        ("module_run_loop_built",
+         "run_loop.py is built and operational.",
+         1.0),
+
+        ("module_goal_stack_pending",
+         "goal_stack.py has no LLM-driven decomposition. "
+         "Callers provide subgoal descriptions manually.",
+         1.0),
+
+        # ── Experimental findings ─────────────────────────────────────────────
+        ("exp0_result",
+         "GPT-2 zero-shot scored 0%. It generates shape, not logic.",
+         1.0),
+
+        ("exp1_result",
+         "Two-agent debate scored 53% with hint injection.",
+         1.0),
+
+        ("exp2_result",
+         "Exp 2 full pipeline was built but has not been run.",
+         1.0),
+
+        ("finding_evaluative_selfcorrect",
+         "Evaluative agents (Skeptic, Ethicist) self-correct via memory "
+         "retrieval unprompted.",
+         1.0),
+
+        ("finding_procedural_collapse",
+         "Procedural agents (Planner, Engineer) collapse without "
+         "attribution scaffolding.",
+         1.0),
+
+        ("finding_coverage_metrics_broken",
+         "Standard coverage metrics are broken for multi-agent eval. "
+         "Task pass rate is the correct measure.",
+         1.0),
+
+        ("finding_debate_viable",
+         "Debate architecture is viable as a commit protocol.",
+         1.0),
+
+        # ── Architecture decisions ────────────────────────────────────────────
+        ("arch_async_first",
+         "debate_async.py is the primary runner pattern. "
+         "Async-first is the established approach.",
+         1.0),
+
+        ("arch_memory_dual_layer",
+         "Memory is dual-layer: memory.py for persistent notes, "
+         "agent_memory.py for episodic retrieval.",
+         1.0),
+
+        ("arch_role_differentiation",
+         "Procedural vs evaluative role distinction changes agent behavior "
+         "functionally, not cosmetically.",
+         1.0),
+
+        ("arch_identity_constitutive",
+         "Role identity must be present from first output. "
+         "Adding it later degrades behavior.",
+         1.0),
+
+        ("arch_model_agnostic",
+         "call_llm() routes to Anthropic or Ollama based on "
+         "ANTHROPIC_API_KEY presence in config.",
+         1.0),
+
+        ("arch_consensus_challenge_accept",
+         "Consensus uses challenge/accept: one node produces output, "
+         "Skeptic gets one veto round.",
+         1.0),
+
+        ("arch_sequential_decomposition",
+         "GoalStack.decompose() chains children sequentially by default. "
+         "Parallel decomposition requires explicit depends_on.",
+         1.0),
+
+        # ── Hardware and cost constraints ─────────────────────────────────────
+        ("constraint_hardware",
+         "Primary hardware is M1 MacBook Air 8GB. "
+         "No local training is possible on this hardware.",
+         1.0),
+
+        ("constraint_api_cost",
+         "Anthropic API is the current model provider. "
+         "Cost is a real constraint on always-on operation.",
+         1.0),
+
+        ("constraint_migration_target",
+         "Target migration path is Anthropic now, "
+         "Ollama plus local model when hardware allows.",
+         1.0),
+
+        # ── Known gaps ────────────────────────────────────────────────────────
+        ("gap_llm_decomposition",
+         "No node currently calls an LLM to decompose goals. "
+         "Planner decomposition is not yet autonomous.",
+         1.0),
+
+        ("gap_can_handle_keyword",
+         "LegionNode.can_handle() uses keyword matching. "
+         "Subgoal descriptions must contain capability keywords "
+         "or dispatch is skipped.",
+         1.0),
+
+        ("gap_engineer_node_missing",
+         "No Engineer node exists. Goals requiring implementation, "
+         "coding, or testing have no capable node.",
+         1.0),
+
+        ("gap_ethicist_node_missing",
+         "No Ethicist node exists. "
+         "Consensus evaluator pool has only Skeptic.",
+         1.0),
+    ]
+
+    print("[bootstrap] starting", flush=True)
+
+    for i, (belief_id, content, confidence) in enumerate(beliefs):
+        print(f"[bootstrap] writing {i}: {belief_id}", flush=True)
+        await wm.add_belief(
+            belief_id=belief_id,
+            content=content,
+            confidence=confidence,
+            source="bootstrap",
+            tags=["bootstrap"],
+        )
+
+    print(f"[bootstrap] done, wrote {len(beliefs)}", flush=True)
+    return len(beliefs)
+=== ./src/legion/consensus.py ===
+"""
+Legion ConsensusEngine
+======================
+Implements the challenge/accept commit protocol for Legion beliefs.
+
+Mechanism (Option B — Challenge/Accept):
+    1. A procedural node produces an output (result string)
+    2. ConsensusEngine selects an evaluative node to challenge it
+    3. Evaluative node receives the output + world model context and returns
+       a structured verdict: {"verdict": "accept"|"reject", "reason": "...",
+                               "confidence": 0.0-1.0}
+    4. If verdict == "accept" (or evaluator is unavailable/malformed):
+       → result is committed as a Belief in wm
+    5. If verdict == "reject":
+       → result is NOT committed; rejection reason is logged as an event
+       → goal is returned to "pending" for retry or human escalation
+
+Design decisions:
+    - Structured signal, not parsed language. Evaluator must return JSON.
+      Malformed response → accept with confidence=0.3 and a warning event.
+      A broken evaluator must not permanently block a goal.
+    - One challenge round maximum. This is not a debate loop. The evaluative
+      node gets one pass. If it rejects, the goal retries — it doesn't enter
+      an infinite challenge cycle.
+    - Evaluative node selection: prefer nodes with role_type=="evaluative"
+      that are currently idle. If none available, skip challenge and commit
+      with reduced confidence (logged). Cost constraint makes this correct —
+      blocking commits until an evaluator is free would stall the system.
+    - Confidence propagates: accepted beliefs carry the evaluator's stated
+      confidence. Unchallenged beliefs carry a default of 0.6 (committed,
+      but flagged as unreviewed).
+
+Relationship to existing code:
+    - Evaluative agent prompts (skeptic, ethicist) in prompts.py are the
+      template for challenge prompts. Legion challenge prompt extends them
+      with a JSON response requirement.
+    - llm_client.call_llm() is the inference call, same as all other nodes.
+    - Beliefs written here are what wm.get_active_beliefs() returns — the
+      collective's committed worldview that all nodes read as ground truth.
+"""
+
+import json
+import asyncio
+from datetime import datetime
+from typing import Optional, TYPE_CHECKING
+
+from llm_client import call_llm
+
+if TYPE_CHECKING:
+    from world_model import SharedWorldModel, Goal
+    from dispatcher import LegionNode
+
+
+# ── Prompt ────────────────────────────────────────────────────────────────────
+
+CHALLENGE_SYSTEM = (
+    "You are a rigorous evaluator in a multi-agent AI system. "
+    "Your job is to assess whether a proposed output is sound enough "
+    "to be committed as a collective belief. You are not negative for "
+    "its own sake — you accept good work. You reject work that has "
+    "clear logical errors, unsupported assumptions, or would cause "
+    "downstream failures if treated as true.\n\n"
+    "You must respond with a single JSON object and nothing else. "
+    "No preamble, no explanation outside the JSON. Schema:\n"
+    '{"verdict": "accept" | "reject", "reason": "<one sentence>", '
+    '"confidence": <float 0.0-1.0>}'
+)
+
+CHALLENGE_USER = (
+    "GOAL: {goal_description}\n\n"
+    "PROPOSED OUTPUT:\n{result}\n\n"
+    "COLLECTIVE CONTEXT (recent relevant events):\n{context}\n\n"
+    "Evaluate the proposed output. Does it adequately accomplish the goal? "
+    "Are there logical errors, unsupported claims, or failure modes that "
+    "would make this unsafe to treat as a committed belief?\n\n"
+    "Respond with JSON only."
+)
+
+# Belief ID derived from goal — stable across retries
+def _belief_id(goal: "Goal") -> str:
+    return f"belief_{goal.id}"
+
+
+# ── Verdict parsing ───────────────────────────────────────────────────────────
+
+def _parse_verdict(raw: str) -> dict:
+    """
+    Parse the evaluator's JSON response into a verdict dict.
+
+    On any parse failure, returns a safe default:
+        {"verdict": "accept", "confidence": 0.3, "reason": "parse_failed", "malformed": True}
+
+    This default is intentional: a broken evaluator must not permanently
+    block a goal. The "malformed" flag ensures the failure is visible
+    in the event log and the low confidence marks the belief as unreviewed.
+    """
+    try:
+        # Strip markdown code fences if the model wrapped its JSON
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.split("\n")
+            cleaned = "\n".join(
+                line for line in lines
+                if not line.startswith("```")
+            ).strip()
+
+        data = json.loads(cleaned)
+
+        verdict    = str(data.get("verdict", "accept")).lower()
+        confidence = float(data.get("confidence", 0.5))
+        reason     = str(data.get("reason", "no reason given"))
+
+        if verdict not in ("accept", "reject"):
+            verdict = "accept"
+            confidence = 0.3
+
+        confidence = max(0.0, min(1.0, confidence))
+
+        return {
+            "verdict":    verdict,
+            "confidence": confidence,
+            "reason":     reason,
+            "malformed":  False,
+        }
+
+    except Exception as e:
+        return {
+            "verdict":    "accept",
+            "confidence": 0.3,
+            "reason":     f"parse_failed: {e}",
+            "malformed":  True,
+        }
+
+
+# ── ConsensusEngine ───────────────────────────────────────────────────────────
+
+class ConsensusEngine:
+    """
+    Manages the challenge/accept protocol and belief commitment.
+
+    Usage (called by Dispatcher after a node completes a goal):
+        engine = ConsensusEngine(wm, config, evaluative_nodes)
+        committed = await engine.evaluate(goal, result, producing_node_name)
+        if committed:
+            # belief is now in wm.beliefs, visible to all nodes
+        else:
+            # goal was returned to pending for retry
+    """
+
+    def __init__(
+        self,
+        world_model:      "SharedWorldModel",
+        config,                                 # Config from config.py
+        evaluative_nodes: list["LegionNode"],   # nodes with role_type=="evaluative"
+        max_retries:      int = 2,              # how many times a goal can be rejected before escalation
+    ):
+        self.wm               = world_model
+        self.config           = config
+        self.evaluative_nodes = {n.name: n for n in evaluative_nodes}
+        self.max_retries      = max_retries
+
+    # ── Evaluator selection ───────────────────────────────────────────────────
+
+    def _select_evaluator(self) -> Optional["LegionNode"]:
+        """
+        Find an idle evaluative node.
+        Returns None if all evaluative nodes are busy — caller will skip challenge.
+        """
+        for node in self.evaluative_nodes.values():
+            record = self.wm.nodes.get(node.name)
+            if record and record.status == "idle":
+                return node
+        return None
+
+    # ── Core protocol ─────────────────────────────────────────────────────────
+
+    async def evaluate(
+        self,
+        goal:     "Goal",
+        result:   str,
+        producer: str,
+    ) -> bool:
+        """
+        Run the challenge/accept protocol for a completed goal.
+
+        Args:
+            goal:     The goal that was just completed.
+            result:   The output produced by the procedural node.
+            producer: Name of the node that produced the result.
+
+        Returns:
+            True  → result committed as a belief, goal remains complete.
+            False → result rejected, goal returned to pending for retry.
+        """
+        evaluator = self._select_evaluator()
+
+        if evaluator is None:
+            # No evaluative node available — commit with reduced confidence
+            await self._commit(
+                goal=goal,
+                result=result,
+                confidence=0.6,
+                source=producer,
+                reason="no evaluator available",
+                challenged=False,
+            )
+            return True
+
+        # Mark evaluator busy for the duration of the challenge call
+        record = self.wm.nodes[evaluator.name]
+        record.status          = "busy"
+        record.current_goal_id = goal.id
+        await self.wm.save()
+
+        try:
+            verdict = await self._challenge(goal, result, evaluator)
+        finally:
+            record.status          = "idle"
+            record.current_goal_id = None
+            record.tasks_completed += 1
+            await self.wm.save()
+
+        if verdict["malformed"]:
+            await self.wm.add_event(
+                agent="consensus",
+                event_type="evaluator_malformed",
+                content=f"Evaluator {evaluator.name} returned unparseable verdict. "
+                        f"Committing with low confidence. Raw reason: {verdict['reason']}",
+                importance=0.7,
+                goal_id=goal.id,
+            )
+
+        if verdict["verdict"] == "accept":
+            await self._commit(
+                goal=goal,
+                result=result,
+                confidence=verdict["confidence"],
+                source=f"{producer} / verified by {evaluator.name}",
+                reason=verdict["reason"],
+                challenged=True,
+            )
+            return True
+
+        else:
+            await self._reject(goal, verdict, evaluator.name)
+            return False
+
+    # ── Challenge call ────────────────────────────────────────────────────────
+
+    async def _challenge(
+        self,
+        goal:      "Goal",
+        result:    str,
+        evaluator: "LegionNode",
+    ) -> dict:
+        """
+        Call the evaluative node's LLM with the challenge prompt.
+        Returns a parsed verdict dict.
+        """
+        context = self.wm.format_context_for_prompt(
+            query=goal.description,
+            top_k=4,
+            agent_filter=None,  # evaluator sees the full collective context
+        )
+
+        messages = [
+            {"role": "system", "content": CHALLENGE_SYSTEM},
+            {
+                "role": "user",
+                "content": CHALLENGE_USER.format(
+                    goal_description=goal.description,
+                    result=result,
+                    context=context or "(no prior collective context)",
+                ),
+            },
+        ]
+
+        raw_response, _usage = await call_llm(messages, self.config)
+        return _parse_verdict(raw_response)
+
+    # ── Commit / Reject ───────────────────────────────────────────────────────
+
+    async def _commit(
+        self,
+        goal:       "Goal",
+        result:     str,
+        confidence: float,
+        source:     str,
+        reason:     str,
+        challenged: bool,
+    ) -> None:
+        """Write the result to wm.beliefs and log the commit event."""
+        belief_id = _belief_id(goal)
+        await self.wm.add_belief(
+            belief_id=belief_id,
+            content=result,
+            confidence=confidence,
+            source=source,
+            tags=[goal.id, "consensus"],
+            evidence=[reason],
+        )
+        challenged_str = "challenged+accepted" if challenged else "unchallenged"
+        await self.wm.add_event(
+            agent="consensus",
+            event_type="belief_formed",
+            content=(
+                f"Belief committed [{challenged_str}, confidence={confidence:.2f}]: "
+                f"{goal.description}\n{result[:200]}{'...' if len(result) > 200 else ''}"
+            ),
+            importance=confidence,
+            goal_id=goal.id,
+            tags=["belief", challenged_str],
+        )
+
+    async def _reject(
+        self,
+        goal:          "Goal",
+        verdict:       dict,
+        evaluator_name: str,
+    ) -> None:
+        """
+        Log the rejection and return the goal to pending for retry.
+
+        Tracks rejection count via a belief with low confidence.
+        If max_retries exceeded, marks goal abandoned and logs escalation.
+        """
+        # Use a rejection-tracking belief to count retries across sessions
+        retry_belief_id = f"retry_count_{goal.id}"
+        existing = self.wm.beliefs.get(retry_belief_id)
+        retry_count = int(existing.content) + 1 if existing else 1
+
+        await self.wm.add_belief(
+            belief_id=retry_belief_id,
+            content=str(retry_count),
+            confidence=0.0,         # 0.0 keeps it out of get_active_beliefs()
+            source="consensus",
+            tags=["internal", "retry_counter"],
+        )
+
+        await self.wm.add_event(
+            agent="consensus",
+            event_type="belief_rejected",
+            content=(
+                f"Evaluator {evaluator_name} rejected output for: {goal.description}\n"
+                f"Reason: {verdict['reason']}\n"
+                f"Retry {retry_count}/{self.max_retries}"
+            ),
+            importance=0.8,
+            goal_id=goal.id,
+            tags=["rejection"],
+        )
+
+        if retry_count >= self.max_retries:
+            await self.wm.update_goal_status(goal.id, status="abandoned")
+            await self.wm.add_event(
+                agent="consensus",
+                event_type="goal_escalated",
+                content=(
+                    f"Goal exceeded max retries ({self.max_retries}) and requires "
+                    f"human review: {goal.description}"
+                ),
+                importance=1.0,
+                goal_id=goal.id,
+                tags=["escalation", "human_required"],
+            )
+        else:
+            # Return to pending for retry — clear assignment so dispatcher can reclaim
+            await self.wm.update_goal_status(goal.id, status="pending", clear_assignment=True)
+
+    # ── Introspection ─────────────────────────────────────────────────────────
+
+    def status_report(self) -> str:
+        """Terse evaluator status for run_loop logging."""
+        lines = []
+        for name, node in self.evaluative_nodes.items():
+            record = self.wm.nodes.get(name)
+            status = record.status if record else "unregistered"
+            lines.append(f"  {name} [{status}]")
+        return "Evaluators:\n" + "\n".join(lines) if lines else "Evaluators: none registered"
+=== ./src/legion/dispatcher.py ===
+"""
+Legion Dispatcher
+=================
+Matches goals to nodes and manages the claim/execute/release cycle.
+
+Responsibilities:
+    - Node registry: register/deregister LegionNodes at startup
+    - Selection: given a goal, find a capable idle node
+    - Claim: mark node busy + goal active atomically before dispatch
+    - Execute: call node.fn(goal, wm), await result
+    - Release: on success → complete goal, mark node idle
+              on failure → fail goal, mark node idle, log event
+
+Not responsible for:
+    - Deciding WHAT to work on (GoalStack)
+    - Deciding WHETHER a result is true (consensus.py)
+    - The heartbeat / tick loop (run_loop.py)
+
+Relationship to existing code:
+    - debate_async.py called agents directly by name; Dispatcher replaces
+      that hard-coded routing with capability-based selection
+    - Nodes are thin LegionNode dataclasses; their .fn is the async callable
+      that replaces the agent functions in agents.py
+
+Async model:
+    - dispatch_one() handles a single goal end-to-end
+    - dispatch_all() runs all eligible goals concurrently (asyncio.gather)
+    - Both are safe to call from run_loop.py's tick
+"""
+
+import asyncio
+import traceback
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Callable, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from world_model import SharedWorldModel, Goal
+    from goal_stack import GoalStack
+
+
+# ── Node definition ───────────────────────────────────────────────────────────
+
+@dataclass
+class LegionNode:
+    """
+    A Legion node: identity + capability declaration + async callable.
+
+    The fn signature is:
+        async def fn(goal: Goal, wm: SharedWorldModel) -> str
+    It must return a result string and write any intermediate outputs
+    to wm via add_event(). It must NOT update goal status — that's
+    the dispatcher's job.
+
+    role_type drives evaluative vs procedural behavior:
+        "procedural"  — Planner, Engineer: need attribution scaffolding
+        "evaluative"  — Skeptic, Ethicist: self-correct via memory retrieval
+    """
+    name:         str
+    role_type:    str                    # "procedural" | "evaluative"
+    capabilities: list[str]             # e.g. ["plan", "decompose"]
+    fn:           Callable              # async (goal, wm) -> str
+
+    def can_handle(self, goal: "Goal") -> bool:
+        """
+        True if this node has at least one capability relevant to the goal.
+
+        Current implementation: keyword match against goal description.
+        Future: embed goal + capabilities and use cosine similarity.
+        """
+        desc_lower = goal.description.lower()
+        return any(cap.lower() in desc_lower for cap in self.capabilities)
+
+
+# ── Dispatcher ────────────────────────────────────────────────────────────────
+
+class Dispatcher:
+    """
+    Routes goals to nodes and manages the full execution lifecycle.
+
+    Usage (from run_loop.py):
+        dispatcher = Dispatcher(wm, gs)
+        dispatcher.register(planner_node)
+        dispatcher.register(skeptic_node)
+
+        # In the tick loop:
+        await dispatcher.dispatch_all()
+    """
+
+    def __init__(self, world_model: "SharedWorldModel", goal_stack: "GoalStack"):
+        self.wm = world_model
+        self.gs = goal_stack
+        self.nodes: dict[str, LegionNode] = {}
+
+    # ── Registry ──────────────────────────────────────────────────────────────
+
+    def register(self, node: LegionNode) -> None:
+        """
+        Register a node with the dispatcher and world model.
+        Safe to call multiple times — re-registration updates the record.
+        Must be called before dispatch_all() for the node to receive work.
+        """
+        self.nodes[node.name] = node
+        # Register synchronously in the node dict; wm registration is async
+        # and will be finalized on first dispatch or via register_all()
+
+    async def register_all(self) -> None:
+        """Persist all registered nodes to wm. Call once at startup."""
+        for node in self.nodes.values():
+            await self.wm.register_node(
+                name=node.name,
+                role_type=node.role_type,
+                capabilities=node.capabilities,
+            )
+
+    def deregister(self, node_name: str) -> None:
+        """Remove a node from the active pool. Does not delete wm record."""
+        self.nodes.pop(node_name, None)
+
+    # ── Selection ─────────────────────────────────────────────────────────────
+
+    def _find_node(self, goal: "Goal") -> Optional[LegionNode]:
+        """
+        Find the best idle node for a goal.
+
+        Selection order:
+          1. Node must be registered and wm-tracked as "idle"
+          2. Node must can_handle(goal)
+          3. Among eligible nodes, prefer the one with fewest tasks_completed
+             (load balancing — avoids always routing to the same node)
+
+        Returns None if no eligible node exists.
+        """
+        eligible = []
+        for node in self.nodes.values():
+            wm_record = self.wm.nodes.get(node.name)
+            if wm_record is None:
+                continue
+            if wm_record.status != "idle":
+                continue
+            if not node.can_handle(goal):
+                continue
+            eligible.append((node, wm_record.tasks_completed))
+
+        if not eligible:
+            return None
+
+        # Least-loaded first
+        eligible.sort(key=lambda x: x[1])
+        return eligible[0][0]
+
+    # ── Claim / Release ───────────────────────────────────────────────────────
+
+    async def _claim(self, node: LegionNode, goal: "Goal") -> None:
+        """Mark node busy and goal active before execution begins."""
+        record = self.wm.nodes[node.name]
+        record.status          = "busy"
+        record.last_active     = datetime.now().isoformat()
+        record.current_goal_id = goal.id
+        await self.wm.update_goal_status(goal.id, status="active", assigned_to=node.name)
+        await self.wm.save()
+
+    async def _release(self, node: LegionNode, success: bool = True) -> None:
+        """Return node to idle pool after execution completes or fails."""
+        record = self.wm.nodes.get(node.name)
+        if record is None:
+            return
+        record.status          = "idle"
+        record.current_goal_id = None
+        record.last_active     = datetime.now().isoformat()
+        if success:
+            record.tasks_completed += 1
+        await self.wm.save()
+
+    # ── Execution ─────────────────────────────────────────────────────────────
+
+    async def dispatch_one(self, goal: "Goal") -> bool:
+        """
+        Full claim → execute → release cycle for a single goal.
+
+        Returns True on success, False on failure.
+        Never raises — all exceptions are caught, logged, and converted
+        to goal failure events so run_loop.py stays alive.
+        """
+        node = self._find_node(goal)
+        if node is None:
+            # No capable idle node right now. Goal stays pending.
+            # run_loop will retry on next tick.
+            await self.wm.add_event(
+                agent="dispatcher",
+                event_type="dispatch_skipped",
+                content=f"No capable idle node for: {goal.description}",
+                importance=0.3,
+                goal_id=goal.id,
+            )
+            return False
+
+        await self._claim(node, goal)
+
+        try:
+            result = await node.fn(goal, self.wm)
+            await self.gs.complete(goal.id, result=result, node_id=node.name)
+            await self._release(node, success=True)
+            return True
+
+        except Exception as e:
+            reason = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
+            await self.gs.fail(goal.id, reason=reason, node_id=node.name)
+            await self._release(node, success=False)
+            await self.wm.add_event(
+                agent=node.name,
+                event_type="node_error",
+                content=reason,
+                importance=0.8,
+                goal_id=goal.id,
+            )
+            return False
+
+    async def dispatch_all(self) -> dict:
+        """
+        Dispatch all currently eligible goals concurrently.
+
+        Pulls all pending unblocked goals from GoalStack, finds a node
+        for each, and runs them in parallel via asyncio.gather().
+
+        Goals with no available node are skipped and retried next tick.
+        Goals that would exceed available nodes are left pending.
+
+        Returns a summary dict for run_loop.py logging:
+            {"dispatched": int, "skipped": int, "failed": int}
+        """
+        # Snapshot the eligible queue — don't mutate while iterating
+        candidates = [
+            g for g in self.wm.get_pending_goals()
+            if g.assigned_to is None
+        ]
+
+        if not candidates:
+            return {"dispatched": 0, "skipped": 0, "failed": 0}
+
+        results = await asyncio.gather(
+            *[self.dispatch_one(goal) for goal in candidates],
+            return_exceptions=False,  # exceptions handled inside dispatch_one
+        )
+
+        dispatched = sum(1 for r in results if r is True)
+        failed     = sum(1 for r in results if r is False)
+
+        return {
+            "dispatched": dispatched,
+            "skipped":    len(candidates) - dispatched - failed,
+            "failed":     failed,
+        }
+
+    # ── Introspection ─────────────────────────────────────────────────────────
+
+    def status_report(self) -> str:
+        """Terse node status for injection into run_loop logs."""
+        lines = []
+        for node in self.nodes.values():
+            record = self.wm.nodes.get(node.name)
+            if record is None:
+                lines.append(f"  {node.name}: unregistered")
+                continue
+            goal_str = f" → {record.current_goal_id}" if record.current_goal_id else ""
+            lines.append(
+                f"  {node.name} [{record.status}]{goal_str} "
+                f"(done: {record.tasks_completed})"
+            )
+        return "Nodes:\n" + "\n".join(lines) if lines else "Nodes: none registered"
+=== ./src/legion/goal_stack.py ===
+"""
+Legion GoalStack
+================
+Interface layer over SharedWorldModel.goals.
+
+Responsibilities:
+    - push / pop_next / peek — goal lifecycle management
+    - Priority ordering — highest priority unblocked goal surfaces first
+    - Decomposition — replace a goal with ordered child goals
+    - Status reporting — formatted snapshot for agent context injection
+
+Not responsible for:
+    - Storage (that's SharedWorldModel)
+    - Consensus (that's consensus.py)
+    - Dispatch (that's dispatcher.py)
+
+Design rule: GoalStack holds NO independent goal state.
+All reads pull from wm.goals. All writes go through wm's async methods.
+This eliminates drift between GoalStack and WorldModel.
+
+Async boundary:
+    - Write-path methods (push, pop_next, complete, fail, decompose) are async
+    - Read-path methods (peek, status_report, get_tree) are sync
+    - Callers in run_loop.py will be async — this matches the pattern in debate_async.py
+"""
+
+import asyncio
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from world_model import SharedWorldModel, Goal
+
+
+class GoalStack:
+    """
+    Priority queue interface over SharedWorldModel.goals.
+
+    All nodes interact with goals through this class.
+    Direct writes to wm.goals are discouraged outside of GoalStack.
+
+    Usage:
+        gs = GoalStack(world_model)
+
+        goal = await gs.push("Implement consensus mechanism", priority=0.9)
+        next_goal = await gs.pop_next("planner_node")
+        await gs.complete(next_goal.id, result="ConsensusEngine built and tested")
+
+        children = await gs.decompose(goal.id, [
+            "Define voting protocol",
+            "Implement quorum logic",
+            "Write integration test",
+        ])
+    """
+
+    def __init__(self, world_model: "SharedWorldModel"):
+        self.wm = world_model
+
+    # ── Write path (async) ────────────────────────────────────────────────────
+
+    async def push(
+        self,
+        description: str,
+        priority:    float = 0.5,
+        source:      str   = "human",
+        parent_id:   Optional[str] = None,
+        depends_on:  Optional[list[str]] = None,
+    ) -> "Goal":
+        """
+        Add a new goal to the collective's work queue.
+
+        Args:
+            description: What needs to be accomplished.
+            priority:    0.0–1.0. Higher surfaces first in pop_next().
+            source:      "human" or the node name that generated the goal.
+                         Self-generated goals (source != "human") are what
+                         make Legion proactive rather than reactive.
+            parent_id:   Set by decompose(). Marks this as a subgoal.
+            depends_on:  List of goal IDs that must be complete before this
+                         goal becomes eligible for pop_next().
+
+        Returns:
+            The newly created Goal (from world_model.Goal).
+        """
+        goal = await self.wm.add_goal(
+            description=description,
+            priority=priority,
+            source=source,
+            parent_id=parent_id,
+            depends_on=depends_on or [],
+        )
+        await self.wm.add_event(
+            agent=source,
+            event_type="goal_added",
+            content=f"Goal added: {description}",
+            importance=priority,
+            goal_id=goal.id,
+        )
+        return goal
+
+    async def pop_next(self, node_id: str) -> Optional["Goal"]:
+        """
+        Claim the highest-priority unblocked, unassigned goal for a node.
+
+        Marks the goal as "active" and assigns it to node_id atomically.
+        Returns None if no eligible goals exist.
+
+        Eligibility rules (mirrors wm.get_pending_goals()):
+            - status == "pending"
+            - all depends_on goals are "complete"
+            - not already assigned
+
+        Args:
+            node_id: The claiming node's name (e.g. "planner_node_1").
+
+        Returns:
+            The claimed Goal, or None.
+        """
+        candidates = self.wm.get_pending_goals()
+        # Filter out goals already assigned to another node
+        # (get_pending_goals returns status=="pending", assigned_to may still be None)
+        unassigned = [g for g in candidates if g.assigned_to is None]
+
+        if not unassigned:
+            return None
+
+        goal = unassigned[0]  # already sorted by priority desc
+        await self.wm.update_goal_status(goal.id, status="active", assigned_to=node_id)
+        await self.wm.add_event(
+            agent=node_id,
+            event_type="goal_claimed",
+            content=f"Node {node_id} claimed goal: {goal.description}",
+            importance=goal.priority,
+            goal_id=goal.id,
+        )
+        # Return the updated goal object
+        return self.wm.goals[goal.id]
+
+    async def complete(self, goal_id: str, result: str, node_id: str = "unknown") -> None:
+        """
+        Mark a goal complete and record its result as a collective event.
+
+        After marking complete, any goals that depend_on this goal_id
+        become eligible for pop_next() automatically — no explicit unblocking
+        needed because eligibility is computed dynamically in get_pending_goals().
+
+        Args:
+            goal_id: ID of the goal to complete.
+            result:  The outcome or artifact produced. Stored as an event
+                     so all nodes can retrieve it via wm.retrieve_context().
+            node_id: The node reporting completion (for event attribution).
+        """
+        if goal_id not in self.wm.goals:
+            raise KeyError(f"Goal '{goal_id}' not found in world model.")
+
+        goal = self.wm.goals[goal_id]
+        await self.wm.update_goal_status(goal_id, status="complete")
+        await self.wm.add_event(
+            agent=node_id,
+            event_type="goal_complete",
+            content=f"Goal complete: {goal.description}\nResult: {result}",
+            importance=goal.priority,
+            goal_id=goal_id,
+        )
+
+    async def fail(self, goal_id: str, reason: str, node_id: str = "unknown") -> None:
+        """
+        Mark a goal failed. Goals that depend on this goal remain blocked.
+
+        The run_loop should detect orphaned blocked goals and decide whether
+        to abandon them, re-route, or escalate to human.
+
+        Args:
+            goal_id: ID of the goal that failed.
+            reason:  What went wrong. Recorded as an event.
+            node_id: The node reporting the failure.
+        """
+        if goal_id not in self.wm.goals:
+            raise KeyError(f"Goal '{goal_id}' not found in world model.")
+
+        goal = self.wm.goals[goal_id]
+        await self.wm.update_goal_status(goal_id, status="abandoned")
+        await self.wm.add_event(
+            agent=node_id,
+            event_type="goal_failed",
+            content=f"Goal failed: {goal.description}\nReason: {reason}",
+            importance=goal.priority,
+            goal_id=goal_id,
+        )
+
+    async def decompose(
+        self,
+        goal_id:  str,
+        subgoals: list[str],
+        source:   str = "planner",
+    ) -> list["Goal"]:
+        """
+        Replace a goal with an ordered list of child goals.
+
+        The parent goal is marked "active" (it's not complete until all
+        children are). Children are created with sequential dependencies:
+        child[n] depends_on child[n-1], so they execute in order by default.
+
+        To allow parallel execution, the caller should push subgoals manually
+        with explicit depends_on instead of using decompose().
+
+        Args:
+            goal_id:  The goal to decompose. Must exist and be "pending" or "active".
+            subgoals: Ordered list of descriptions for child goals.
+            source:   Node performing the decomposition (for event attribution).
+
+        Returns:
+            List of created child Goals.
+        """
+        if goal_id not in self.wm.goals:
+            raise KeyError(f"Goal '{goal_id}' not found in world model.")
+
+        parent = self.wm.goals[goal_id]
+
+        # Inherit parent priority; children can be adjusted after creation
+        priority = parent.priority
+        created: list["Goal"] = []
+        prev_id: Optional[str] = None
+
+        for description in subgoals:
+            child = await self.push(
+                description=description,
+                priority=priority,
+                source=source,
+                parent_id=goal_id,
+                depends_on=[prev_id] if prev_id else [],
+            )
+            created.append(child)
+            prev_id = child.id
+
+        # Mark parent active — it tracks child completion, not direct execution
+        await self.wm.update_goal_status(goal_id, status="active")
+        await self.wm.add_event(
+            agent=source,
+            event_type="goal_decomposed",
+            content=(
+                f"Goal decomposed: {parent.description}\n"
+                f"Into {len(subgoals)} subgoals: {', '.join(subgoals)}"
+            ),
+            importance=priority,
+            goal_id=goal_id,
+        )
+
+        return created
+
+    # ── Read path (sync) ──────────────────────────────────────────────────────
+
+    def peek(self) -> Optional["Goal"]:
+        """
+        Return the highest-priority unblocked, unassigned goal without claiming it.
+        Returns None if the queue is empty.
+        """
+        candidates = [g for g in self.wm.get_pending_goals() if g.assigned_to is None]
+        return candidates[0] if candidates else None
+
+    def get_tree(self, goal_id: str) -> dict:
+        """
+        Return a goal and all its descendants as a nested dict.
+        Useful for run_loop introspection and status reporting.
+        """
+        if goal_id not in self.wm.goals:
+            return {}
+
+        goal = self.wm.goals[goal_id]
+        children = [
+            g for g in self.wm.goals.values()
+            if g.parent_id == goal_id
+        ]
+
+        return {
+            "id":          goal.id,
+            "description": goal.description,
+            "status":      goal.status,
+            "priority":    goal.priority,
+            "assigned_to": goal.assigned_to,
+            "children":    [self.get_tree(c.id) for c in children],
+        }
+
+    def status_report(self) -> str:
+        """
+        Formatted snapshot of the current goal queue.
+        Injected into node prompts so agents know what the collective is working on.
+
+        Format is intentionally terse — this goes into a prompt context window.
+        """
+        goals = list(self.wm.goals.values())
+        if not goals:
+            return "Goal queue: empty"
+
+        pending  = [g for g in goals if g.status == "pending"]
+        active   = [g for g in goals if g.status == "active"]
+        complete = [g for g in goals if g.status == "complete"]
+        failed   = [g for g in goals if g.status == "abandoned"]
+
+        lines = [f"Goals: {len(pending)} pending | {len(active)} active | "
+                 f"{len(complete)} complete | {len(failed)} failed"]
+
+        if active:
+            lines.append("\nACTIVE:")
+            for g in sorted(active, key=lambda x: x.priority, reverse=True):
+                assignee = f" → {g.assigned_to}" if g.assigned_to else ""
+                lines.append(f"  [{g.priority:.1f}] {g.description}{assignee}")
+
+        if pending:
+            lines.append("\nPENDING (next up):")
+            for g in self.wm.get_pending_goals()[:3]:  # top 3 only
+                lines.append(f"  [{g.priority:.1f}] {g.description}")
+            if len(pending) > 3:
+                lines.append(f"  ... and {len(pending) - 3} more")
+
+        return "\n".join(lines)
+=== ./src/legion/run_loop.py ===
+"""
+Legion RunLoop
+==============
+The autonomous heartbeat that drives the hivemind.
+
+This is the top-level entry point for Legion. It wires together:
+    SharedWorldModel → GoalStack → Dispatcher → ConsensusEngine
+
+and runs a continuous tick loop until interrupted or the goal queue
+is exhausted.
+
+Tick model: fixed interval with adaptive sleep.
+    - TICK_INTERVAL_ACTIVE:  seconds between ticks when work is in progress
+    - TICK_INTERVAL_IDLE:    seconds between ticks when queue is empty
+    Two constants, one conditional. No notification infrastructure needed.
+    Tune these experimentally once the loop is running — same approach as
+    RESPONSE_TRUNCATE_CHARS / EXECUTION_MODE in debate_async.py.
+
+Shutdown:
+    - KeyboardInterrupt (Ctrl-C): clean shutdown, state persisted to wm
+    - goal_queue exhausted + no active goals: optional auto-halt (configurable)
+    - max_ticks reached: hard stop for experiment runs
+
+Startup sequence:
+    1. Load world model from disk (or create fresh)
+    2. Register nodes with dispatcher and wm
+    3. Optionally seed initial goals (human or from prior session)
+    4. Enter tick loop
+
+Usage:
+    # Minimal — seed one goal and run
+    asyncio.run(main(
+        initial_goals=["Build and test the consensus mechanism"],
+    ))
+
+    # Experiment mode — fixed tick count, then halt
+    asyncio.run(main(
+        initial_goals=["Analyze the Legion architecture for gaps"],
+        max_ticks=20,
+    ))
+"""
+
+import sys
+import os
+_HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _HERE)                          # src/legion/
+sys.path.insert(0, os.path.dirname(_HERE))         # src/
+
+import asyncio
+import signal
+from datetime import datetime
+from typing import Optional
+
+from world_model import SharedWorldModel
+from goal_stack import GoalStack
+from dispatcher import Dispatcher, LegionNode
+from consensus import ConsensusEngine
+from bootstrap_beliefs import bootstrap_beliefs
+
+# ── Tick constants ────────────────────────────────────────────────────────────
+
+TICK_INTERVAL_ACTIVE = 2.0   # seconds — work is in progress, check frequently
+TICK_INTERVAL_IDLE   = 10.0  # seconds — queue empty, no point hammering wm
+
+# ── Node definitions ──────────────────────────────────────────────────────────
+# These are the Legion-native replacements for the agent functions in agents.py.
+# Each fn signature: async (goal: Goal, wm: SharedWorldModel) -> str
+#
+# Phase 1 implementations are intentionally minimal — they call the LLM with
+# goal context and return the response. Richer behavior (self-retrieval,
+# multi-step reasoning) layers on top of this foundation.
+
+async def _planner_fn(goal, wm: SharedWorldModel) -> str:
+    """
+    Procedural node: decomposes goals into plans.
+    Reads collective context, produces a structured plan.
+    Attribution scaffolding required (JARVIS paper finding) — context
+    injection via wm.format_context_for_prompt() provides this.
+    """
+    from llm_client import call_llm
+    from config import Config
+
+    config  = Config()
+    context = wm.format_context_for_prompt(goal.description, top_k=4)
+    beliefs = wm.get_active_beliefs(min_confidence=0.5)
+    belief_str = "\n".join(f"- {b.content}" for b in beliefs) or "(none yet)"
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a strategic planner in a multi-agent AI collective. "
+                "Your output will be reviewed by an evaluative agent before being "
+                "committed as a collective belief. Be specific and actionable. "
+                "Connect your plan to what the collective already knows."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"GOAL: {goal.description}\n\n"
+                f"COLLECTIVE BELIEFS (committed truths):\n{belief_str}\n\n"
+                f"RECENT COLLECTIVE ACTIVITY:\n{context or '(none)'}\n\n"
+                "Produce a concrete plan to accomplish this goal. "
+                "Identify the key steps, dependencies, and the single most "
+                "important action to take first."
+            ),
+        },
+    ]
+
+    result, _ = await call_llm(messages, config)
+    await wm.add_event(
+        agent="planner",
+        event_type="node_output",
+        content=result,
+        importance=goal.priority,
+        goal_id=goal.id,
+    )
+    return result
+
+
+async def _skeptic_fn(goal, wm: SharedWorldModel) -> str:
+    """
+    Evaluative node: challenges outputs and identifies failure modes.
+    Self-corrects via memory retrieval unprompted (JARVIS paper finding).
+    Used by ConsensusEngine as the default challenger.
+    """
+    from llm_client import call_llm
+    from config import Config
+
+    config  = Config()
+    # Self-retrieval: skeptic reads its own prior outputs — the mechanism
+    # behind emergent self-correction per the JARVIS paper
+    self_context  = wm.format_context_for_prompt(
+        goal.description, top_k=3, agent_filter="skeptic"
+    )
+    group_context = wm.format_context_for_prompt(goal.description, top_k=4)
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a rigorous skeptic in a multi-agent AI collective. "
+                "Your job is to find what's wrong before it fails in practice. "
+                "You are constructive: for every problem you identify, suggest "
+                "what would need to be true for the plan to work."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"GOAL: {goal.description}\n\n"
+                f"YOUR PRIOR ANALYSIS ON RELATED TOPICS:\n"
+                f"{self_context or '(none)'}\n\n"
+                f"COLLECTIVE ACTIVITY:\n{group_context or '(none)'}\n\n"
+                "Identify the unstated assumptions, failure modes, and evidence "
+                "gaps in how this goal is being approached. Be specific."
+            ),
+        },
+    ]
+
+    result, _ = await call_llm(messages, config)
+    await wm.add_event(
+        agent="skeptic",
+        event_type="node_output",
+        content=result,
+        importance=goal.priority,
+        goal_id=goal.id,
+    )
+    return result
+
+
+def _build_default_nodes() -> list[LegionNode]:
+    """
+    Construct the default Legion node pool.
+    Extend this list as new node types are added.
+    """
+    return [
+        LegionNode(
+            name="planner",
+            role_type="procedural",
+            capabilities=["plan", "decompose", "analyze", "design", "build",
+                          "implement", "create", "define", "structure"],
+            fn=_planner_fn,
+        ),
+        LegionNode(
+            name="skeptic",
+            role_type="evaluative",
+            capabilities=["review", "evaluate", "assess", "check", "test",
+                          "verify", "challenge", "audit"],
+            fn=_skeptic_fn,
+        ),
+    ]
+
+
+# ── RunLoop ───────────────────────────────────────────────────────────────────
+
+class RunLoop:
+    """
+    Legion's autonomous heartbeat.
+
+    Wires the full stack together and drives the tick loop.
+    All state lives in wm — RunLoop itself is stateless between ticks.
+
+    Args:
+        wm_path:       Path to world model JSON. Created if absent.
+        max_ticks:     Hard stop after N ticks. None = run until interrupted.
+        auto_halt:     Stop when goal queue is empty and no active goals.
+        nodes:         Override default node pool (for testing or extension).
+        initial_goals: Seed goals to push before the loop starts.
+    """
+
+    def __init__(
+        self,
+        wm_path:       str = "data/world_model.json",
+        max_ticks:     Optional[int] = None,
+        auto_halt:     bool = True,
+        nodes:         Optional[list[LegionNode]] = None,
+        initial_goals: Optional[list[str]] = None,
+    ):
+        self.wm_path       = wm_path
+        self.max_ticks     = max_ticks
+        self.auto_halt     = auto_halt
+        self.node_list     = nodes or _build_default_nodes()
+        self.initial_goals = initial_goals or []
+
+        # Populated during startup()
+        self.wm:         Optional[SharedWorldModel] = None
+        self.gs:         Optional[GoalStack]        = None
+        self.dispatcher: Optional[Dispatcher]       = None
+        self.consensus:  Optional[ConsensusEngine]  = None
+
+        self._running    = False
+        self._tick_count = 0
+
+    # ── Startup ───────────────────────────────────────────────────────────────
+
+    async def startup(self) -> None:
+        """Initialize all components and seed initial goals."""
+        from config import Config
+        config = Config()
+
+        # 1. World model
+        self.wm = SharedWorldModel(self.wm_path)
+        await self.wm.load()
+        belief_count = await bootstrap_beliefs(self.wm)
+        self._log(f"Bootstrap complete", f"{belief_count} beliefs seeded")
+
+
+        # 2. Goal stack
+        self.gs = GoalStack(self.wm)
+
+        # 3. Dispatcher
+        self.dispatcher = Dispatcher(self.wm, self.gs)
+        for node in self.node_list:
+            self.dispatcher.register(node)
+        await self.dispatcher.register_all()
+        self._log("Nodes registered", list(self.dispatcher.nodes.keys()))
+
+        # 4. Consensus engine — evaluative nodes only
+        evaluative = [n for n in self.node_list if n.role_type == "evaluative"]
+        self.consensus = ConsensusEngine(self.wm, config, evaluative)
+
+        # 5. Seed initial goals
+        for description in self.initial_goals:
+            goal = await self.gs.push(description, priority=0.7, source="human")
+            self._log(f"Seeded goal: {goal.id}", description)
+
+        self._running = True
+        self._log("Legion startup complete")
+
+    # ── Tick ──────────────────────────────────────────────────────────────────
+
+    async def tick(self) -> float:
+        """
+        One tick: dispatch eligible goals, run consensus on completions.
+        Returns the sleep interval to use before the next tick.
+        """
+        self._tick_count += 1
+        self._log(f"── Tick {self._tick_count} ──────────────────────")
+
+        # Dispatch all eligible goals concurrently
+        dispatch_result = await self.dispatcher.dispatch_all()
+        self._log("Dispatch", dispatch_result)
+
+        # Run consensus on any goals that completed this tick
+        # (goals whose status just became "complete" but have no belief yet)
+        await self._run_consensus_on_completions()
+
+        # Status snapshot
+        wm_status = self.wm.status()
+        self._log("World model", wm_status)
+
+        # Adaptive sleep: idle if nothing is happening
+        has_active = wm_status["goals_active"] > 0
+        has_pending = wm_status["goals_pending"] > 0
+        if has_active or has_pending:
+            return TICK_INTERVAL_ACTIVE
+        return TICK_INTERVAL_IDLE
+
+    async def _run_consensus_on_completions(self) -> None:
+        """
+        Find recently completed goals that haven't been through consensus yet
+        and run the challenge/accept protocol on them.
+
+        Detection: a goal is "needs consensus" if status=="complete" and
+        no belief with id belief_{goal.id} exists in wm.beliefs.
+        """
+        from consensus import _belief_id
+
+        needs_consensus = [
+            g for g in self.wm.goals.values()
+            if g.status == "complete"
+            and _belief_id(g) not in self.wm.beliefs
+        ]
+
+        for goal in needs_consensus:
+            # Find the most recent node_output event for this goal
+            relevant_events = [
+                e for e in reversed(self.wm.events)
+                if e.goal_id == goal.id and e.event_type == "node_output"
+            ]
+            if not relevant_events:
+                continue
+
+            result    = relevant_events[0].content
+            producer  = relevant_events[0].agent
+
+            self._log(f"Consensus: evaluating {goal.id}")
+            committed = await self.consensus.evaluate(goal, result, producer)
+            self._log(f"Consensus: {'committed' if committed else 'rejected'}", goal.id)
+
+    # ── Halt detection ────────────────────────────────────────────────────────
+
+    def _should_halt(self) -> tuple[bool, str]:
+        """
+        Check whether the loop should stop.
+        Returns (should_halt, reason).
+        """
+        if self.max_ticks and self._tick_count >= self.max_ticks:
+            return True, f"max_ticks={self.max_ticks} reached"
+
+        if self.auto_halt:
+            s = self.wm.status()
+            if s["goals_pending"] == 0 and s["goals_active"] == 0:
+                return True, "goal queue exhausted"
+
+        return False, ""
+
+    # ── Main loop ─────────────────────────────────────────────────────────────
+
+    async def run(self) -> None:
+        """Start Legion and run until halted."""
+        await self.startup()
+
+        # Register clean shutdown on SIGINT/SIGTERM
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, self._request_stop)
+
+        try:
+            while self._running:
+                sleep_interval = await self.tick()
+
+                halt, reason = self._should_halt()
+                if halt:
+                    self._log(f"Halting: {reason}")
+                    break
+
+                self._log(f"Sleeping {sleep_interval}s")
+                await asyncio.sleep(sleep_interval)
+
+        except Exception as e:
+            self._log(f"RunLoop error: {e}")
+            raise
+        finally:
+            await self.shutdown()
+
+    def _request_stop(self) -> None:
+        """Signal handler — sets flag for clean loop exit."""
+        self._log("Stop requested")
+        self._running = False
+
+    # ── Shutdown ──────────────────────────────────────────────────────────────
+
+    async def shutdown(self) -> None:
+        """Persist state and log final status."""
+        if self.wm:
+            await self.wm.save()
+            self._log("Shutdown complete", self.wm.status())
+
+    # ── Logging ───────────────────────────────────────────────────────────────
+
+    def _log(self, msg: str, detail=None) -> None:
+        ts = datetime.now().strftime("%H:%M:%S")
+        detail_str = f" {detail}" if detail is not None else ""
+        print(f"[Legion {ts}] {msg}{detail_str}", flush=True)
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+
+async def main(
+    initial_goals: list[str] = None,
+    wm_path:       str = "data/world_model.json",
+    max_ticks:     Optional[int] = None,
+    auto_halt:     bool = True,
+):
+    loop = RunLoop(
+        wm_path=wm_path,
+        max_ticks=max_ticks,
+        auto_halt=auto_halt,
+        initial_goals=initial_goals or [],
+    )
+    await loop.run()
+
+
+if __name__ == "__main__":
+    # Default run: seed one goal and let Legion work autonomously
+    asyncio.run(main(
+        initial_goals=[
+            "Analyze the Legion architecture and identify the most critical "
+            "missing capability for autonomous goal pursuit."
+        ],
+        max_ticks=10,   # Safe default for first run — remove for continuous operation
+    ))
+=== ./src/legion/world_model.py ===
+"""
+Legion SharedWorldModel
+========================
+The collective's persistent, shared memory. All nodes read and write here.
+This is what makes Legion a hivemind rather than a debate system.
+
+Replaces: AgentMemory (ephemeral, per-agent)
+Extends:  memory.py (persistent, but single-user note storage)
+
+Architecture:
+    - Beliefs: things the collective has committed to as true
+    - Goals:   what the collective wants to accomplish (feeds GoalStack)
+    - Events:  append-only log of everything that happened
+    - Nodes:   registry of active agents and their capabilities
+
+Storage: JSON on disk (simple, inspectable, no dependencies)
+Retrieval: Same recency+importance+relevance formula from AgentMemory,
+           now operating across the shared pool instead of per-agent.
+
+Thread-safe: asyncio.Lock protects all writes (debate_async.py is async).
+
+Next files to build:
+    - goal_stack.py   (reads/writes self.goals)
+    - dispatcher.py   (reads self.beliefs, writes self.events)
+    - consensus.py    (writes self.beliefs after node voting)
+    - run_loop.py     (the autonomous heartbeat)
+"""
+
+import json
+import re
+import asyncio
+import numpy as np
+from datetime import datetime
+from dataclasses import dataclass, field, asdict
+from pathlib import Path
+from typing import Optional
+
+
+# ── Data structures ───────────────────────────────────────────────────────────
+
+@dataclass
+class Belief:
+    """
+    Something the collective has committed to as true.
+    Written by ConsensusEngine after nodes reach agreement.
+    """
+    id:          str
+    content:     str
+    confidence:  float
+    source:      str
+    created_at:  str
+    updated_at:  str
+    tags:        list  = field(default_factory=list)
+    evidence:    list  = field(default_factory=list)
+
+
+@dataclass
+class Goal:
+    """
+    Something the collective wants to accomplish.
+    Can be seeded by a human or self-generated by a Planner node.
+    """
+    id:          str
+    description: str
+    priority:    float
+    status:      str            # pending | active | complete | abandoned
+    source:      str            # "human" or node name that generated it
+    created_at:  str
+    updated_at:  str
+    parent_id:   Optional[str] = None
+    depends_on:  list = field(default_factory=list)
+    assigned_to: Optional[str] = None
+
+
+@dataclass
+class Event:
+    """
+    Append-only log entry. Everything that happens gets recorded here.
+    This is the collective's episodic memory.
+    """
+    id:         str
+    event_type: str             # node_output | belief_formed | goal_added | consensus_reached
+    agent:      str
+    content:    str
+    importance: float
+    timestamp:  str
+    goal_id:    Optional[str] = None
+    tags:       list = field(default_factory=list)
+
+
+@dataclass
+class NodeRecord:
+    """Registry entry for an active Legion node."""
+    name:            str
+    role_type:       str        # "procedural" or "evaluative"
+    capabilities:    list
+    last_active:     str
+    tasks_completed: int = 0
+    status:          str = "idle"   # "idle" | "busy" | "offline"
+    current_goal_id: Optional[str] = None  # goal currently assigned to this node
+
+
+# ── World Model ───────────────────────────────────────────────────────────────
+
+class SharedWorldModel:
+    """
+    The Legion hivemind's shared persistent state.
+    All nodes read from and write to a single instance of this class.
+
+    Usage:
+        wm = SharedWorldModel("data/world_model.json")
+        await wm.load()
+
+        await wm.add_event("skeptic", "node_output", "The plan has a flaw...", importance=1.0)
+        await wm.add_belief("plan_is_flawed", "The merge step needs two pointers", confidence=0.9, source="skeptic")
+        context = wm.retrieve_context("merge sort implementation", top_k=5)
+    """
+
+    def __init__(self, path: str = "data/world_model.json", decay: float = 0.01):
+        self.path    = Path(path)
+        self.decay   = decay
+        self._lock   = asyncio.Lock()
+
+        self.beliefs: dict[str, Belief]     = {}
+        self.goals:   dict[str, Goal]       = {}
+        self.events:  list[Event]           = []
+        self.nodes:   dict[str, NodeRecord] = {}
+
+        self._event_counter = 0
+
+    # ── Persistence ───────────────────────────────────────────────────────────
+
+    async def load(self) -> None:
+        if not self.path.exists():
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            await self.save()
+            return
+
+        async with self._lock:
+            with open(self.path) as f:
+                data = json.load(f)
+
+            self.beliefs = {k: Belief(**v) for k, v in data.get("beliefs", {}).items()}
+            self.goals   = {k: Goal(**v)   for k, v in data.get("goals", {}).items()}
+            self.nodes   = {k: NodeRecord(**v) for k, v in data.get("nodes", {}).items()}
+            self.events  = [Event(**e) for e in data.get("events", [])]
+            self._event_counter = len(self.events)
+
+    async def _save_unlocked(self) -> None:
+        """
+        Write current state to disk WITHOUT acquiring the lock.
+        Caller must already hold self._lock.
+        Used internally by write methods that hold the lock to avoid
+        nested lock acquisition (asyncio locks are not reentrant).
+        """
+        data = {
+            "beliefs": {k: asdict(v) for k, v in self.beliefs.items()},
+            "goals":   {k: asdict(v) for k, v in self.goals.items()},
+            "nodes":   {k: asdict(v) for k, v in self.nodes.items()},
+            "events":  [asdict(e) for e in self.events],
+            "meta": {
+                "last_saved":   datetime.now().isoformat(),
+                "event_count":  len(self.events),
+                "belief_count": len(self.beliefs),
+                "goal_count":   len(self.goals),
+            }
+        }
+        with open(self.path, "w") as f:
+            json.dump(data, f, indent=2)
+
+    async def save(self) -> None:
+        """
+        Write current state to disk, acquiring the lock.
+        Use for external callers that do not hold the lock.
+        Internal write methods use _save_unlocked() instead.
+        """
+        async with self._lock:
+            await self._save_unlocked()
+
+    # ── Write operations ──────────────────────────────────────────────────────
+
+    async def add_event(
+        self,
+        agent:      str,
+        event_type: str,
+        content:    str,
+        importance: float = 0.5,
+        goal_id:    Optional[str] = None,
+        tags:       list = None,
+    ) -> Event:
+        """Record anything that happens. Primary write operation for nodes."""
+        self._event_counter += 1
+        event = Event(
+            id=f"evt_{self._event_counter:06d}",
+            event_type=event_type,
+            agent=agent,
+            content=content,
+            importance=importance,
+            timestamp=datetime.now().isoformat(),
+            goal_id=goal_id,
+            tags=tags or [],
+        )
+        async with self._lock:
+            self.events.append(event)
+            await self._save_unlocked()
+        return event
+
+    async def add_belief(
+        self,
+        belief_id:  str,
+        content:    str,
+        confidence: float,
+        source:     str,
+        tags:       list = None,
+        evidence:   list = None,
+    ) -> Belief:
+        """
+        Commit a belief. Called by ConsensusEngine after nodes agree.
+        Updates existing belief if belief_id already exists.
+        """
+        now = datetime.now().isoformat()
+        async with self._lock:
+            if belief_id in self.beliefs:
+                existing = self.beliefs[belief_id]
+                existing.content    = content
+                existing.confidence = confidence
+                existing.updated_at = now
+                if evidence:
+                    existing.evidence.extend(evidence)
+                belief = existing
+            else:
+                belief = Belief(
+                    id=belief_id, content=content, confidence=confidence,
+                    source=source, created_at=now, updated_at=now,
+                    tags=tags or [], evidence=evidence or [],
+                )
+            self.beliefs[belief_id] = belief
+            await self._save_unlocked()
+        return belief
+
+    async def add_goal(
+        self,
+        description: str,
+        priority:    float = 0.5,
+        source:      str   = "human",
+        parent_id:   Optional[str] = None,
+        depends_on:  list  = None,
+    ) -> Goal:
+        """
+        Add a goal. Called by human OR by Planner node (self-direction).
+        Self-generated goals are the key property that makes Legion alive.
+        """
+        goal_id = f"goal_{len(self.goals):04d}_{datetime.now().strftime('%H%M%S')}"
+        now = datetime.now().isoformat()
+        goal = Goal(
+            id=goal_id, description=description, priority=priority,
+            status="pending", source=source, created_at=now, updated_at=now,
+            parent_id=parent_id, depends_on=depends_on or [],
+        )
+        async with self._lock:
+            self.goals[goal_id] = goal
+            await self._save_unlocked()
+        return goal
+
+    async def update_goal_status(
+        self,
+        goal_id:          str,
+        status:           str,
+        assigned_to:      Optional[str] = None,
+        clear_assignment: bool = False,
+    ) -> None:
+        """
+        Update goal status and optionally reassign or clear assignment.
+
+        assigned_to=None, clear_assignment=False (default):
+            Leave assigned_to unchanged.
+        assigned_to="node_name":
+            Set assignee explicitly.
+        clear_assignment=True:
+            Set assigned_to=None, returning the goal to the unassigned pool.
+        """
+        if goal_id not in self.goals:
+            return
+        async with self._lock:
+            goal = self.goals[goal_id]
+            goal.status     = status
+            goal.updated_at = datetime.now().isoformat()
+            if clear_assignment:
+                goal.assigned_to = None
+            elif assigned_to is not None:
+                goal.assigned_to = assigned_to
+            await self._save_unlocked()
+
+    async def register_node(self, name: str, role_type: str, capabilities: list) -> None:
+        now = datetime.now().isoformat()
+        async with self._lock:
+            if name in self.nodes:
+                self.nodes[name].last_active = now
+            else:
+                self.nodes[name] = NodeRecord(
+                    name=name, role_type=role_type,
+                    capabilities=capabilities, last_active=now,
+                )
+            await self._save_unlocked()
+
+    # ── Retrieval ─────────────────────────────────────────────────────────────
+
+    def retrieve_context(self, query: str, top_k: int = 5, agent_filter: str = None) -> list[Event]:
+        """
+        Retrieve relevant events using recency + importance + relevance.
+
+        agent_filter: restrict to one node's outputs — enables self-retrieval,
+                      the mechanism behind emergent self-correction (JARVIS paper).
+        """
+        candidates = self.events
+        if agent_filter:
+            candidates = [e for e in self.events if e.agent == agent_filter]
+        if not candidates:
+            return []
+
+        query_words = set(re.findall(r'\b\w+\b', query.lower()))
+        now = datetime.now()
+        n   = len(candidates)
+
+        hours = np.array([
+            (now - datetime.fromisoformat(e.timestamp)).total_seconds() / 3600
+            for e in candidates
+        ])
+        recency    = np.exp(-self.decay * hours)
+
+        imp        = np.array([e.importance for e in candidates])
+        max_imp    = imp.max()
+        importance = imp / max_imp if max_imp > 0 else np.zeros(n)
+
+        raw_rel   = np.array([
+            len(set(re.findall(r'\b\w+\b', e.content.lower())) & query_words)
+            for e in candidates
+        ])
+        max_rel   = raw_rel.max()
+        relevance = raw_rel / max_rel if max_rel > 0 else np.zeros(n)
+
+        combined = recency + importance + relevance
+        top_idx  = combined.argsort()[::-1][:top_k]
+        return [candidates[i] for i in top_idx]
+
+    def format_context_for_prompt(self, query: str, top_k: int = 5, agent_filter: str = None) -> str:
+        """Ready-to-inject context string for node prompts."""
+        events = self.retrieve_context(query, top_k, agent_filter)
+        if not events:
+            return "(no relevant collective memory)"
+        lines = []
+        for e in events:
+            tag_str = f" [{','.join(e.tags)}]" if e.tags else ""
+            lines.append(f"[{e.agent} | {e.event_type}{tag_str}]\n{e.content}")
+        return "\n\n".join(lines)
+
+    def get_active_beliefs(self, min_confidence: float = 0.5) -> list[Belief]:
+        """The collective's current committed worldview."""
+        return [b for b in self.beliefs.values() if b.confidence >= min_confidence]
+
+    def get_pending_goals(self) -> list[Goal]:
+        """Goals ready to work on, sorted by priority. Used by GoalStack."""
+        ready = [
+            g for g in self.goals.values()
+            if g.status == "pending"
+            and all(
+                self.goals.get(dep, Goal("","","",0,"complete","","","")).status == "complete"
+                for dep in g.depends_on
+            )
+        ]
+        return sorted(ready, key=lambda g: g.priority, reverse=True)
+
+    # ── Introspection ─────────────────────────────────────────────────────────
+
+    def status(self) -> dict:
+        return {
+            "beliefs":       len(self.beliefs),
+            "goals_total":   len(self.goals),
+            "goals_pending": len([g for g in self.goals.values() if g.status == "pending"]),
+            "goals_active":  len([g for g in self.goals.values() if g.status == "active"]),
+            "goals_done":    len([g for g in self.goals.values() if g.status == "complete"]),
+            "events":        len(self.events),
+            "nodes_online":  len(self.nodes),
+        }
+
+    def __repr__(self) -> str:
+        s = self.status()
+        return (
+            f"SharedWorldModel("
+            f"beliefs={s['beliefs']}, "
+            f"goals={s['goals_pending']} pending / {s['goals_done']} done, "
+            f"events={s['events']}, "
+            f"nodes={s['nodes_online']})"
+        )
+=== ./src/llm_bridge.py ===
+"""
+Bridge between JARVIS and the MiniTransformer language model.
+"""
+
+import sys
+import os
+from typing import Optional, Any, Dict
+
+# Build absolute path to LLM directory
+JARVIS_DIR = os.path.dirname(os.path.abspath(__file__))
+LLM_DIR = os.path.join(JARVIS_DIR, '..', 'LLM')
+MODEL_PATH = os.path.join(LLM_DIR, 'models', 'mini_transformer_best.pt')
+
+# Add LLM directory to Python path
+sys.path.insert(0, os.path.abspath(LLM_DIR))
+
+# Try to import from LLM directory
+try:
+    from generate_transformer import load_transformer, generate as transformer_generate  # type: ignore
+    from mini_transformer import MiniTransformer  # type: ignore
+    LLM_AVAILABLE = True
+except ImportError as e:
+    LLM_AVAILABLE = False
+   
+# Global model cache
+_model: Optional[Any] = None
+_stoi: Optional[Dict] = None
+_itos: Optional[Dict] = None
+_block_size: Optional[int] = None
+
+
+def initialize_llm():
+    """Load the transformer model once and cache it"""
+    global _model, _stoi, _itos, _block_size
+    
+    if not LLM_AVAILABLE:
+        print("LLM imports not available")
+        return False
+    
+    if not os.path.exists(MODEL_PATH):
+        print(f"Model file not found at: {MODEL_PATH}")
+        return False
+    
+    if _model is None:
+        try:
+            print("Loading transformer model...")
+            _model, _stoi, _itos, _block_size = load_transformer(MODEL_PATH)
+            print("✓ Transformer ready")
+            return True
+        except Exception as e:
+            print(f"Error loading transformer: {e}")
+            return False
+    
+    return True
+
+
+def generate_text(prompt, length=200, temperature=0.7):
+    """Generate text using the transformer"""
+    if not LLM_AVAILABLE:
+        return None
+    
+    if _model is None:
+        if not initialize_llm():
+            return None
+    
+    try:
+        text = transformer_generate(
+            _model, _stoi, _itos,
+            prompt, length, temperature, _block_size
+        )
+        return text
+    except Exception as e:
+        print(f"Error generating text: {e}")
+        return None
+
+
+def is_available():
+    """Check if LLM is available"""
+    return LLM_AVAILABLE and os.path.exists(MODEL_PATH)
+=== ./src/llm_client.py ===
+"""
+Async HTTP client for communicating with Ollama or Anthropic API.
+Routes to Anthropic if ANTHROPIC_API_KEY is set, otherwise uses Ollama.
+"""
+
+import httpx
+from config import Config
+
+
+async def call_anthropic(
+    messages: list[dict],
+    config: Config,
+) -> tuple[str, dict]:
+    url = "https://api.anthropic.com/v1/messages"
+
+    # Anthropic expects system prompt as top-level field, not a message
+    system_prompt = ""
+    filtered_messages = []
+    for m in messages:
+        if m["role"] == "system":
+            system_prompt = m["content"]
+        else:
+            filtered_messages.append(m)
+
+    payload = {
+        "model": config.model,
+        "max_tokens": config.max_tokens,
+        "temperature": config.temperature,
+        "system": system_prompt,
+        "messages": filtered_messages,
+    }
+
+    headers = {
+        "x-api-key": config.anthropic_api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+
+    async with httpx.AsyncClient(timeout=config.timeout) as client:
+        response = await client.post(url, json=payload, headers=headers)
+
+        if response.status_code != 200:
+            raise httpx.HTTPStatusError(
+                f"Anthropic returned {response.status_code}: {response.text}",
+                request=response.request,
+                response=response,
+            )
+
+        data = response.json()
+
+    text: str = data["content"][0]["text"]
+    usage: dict = {
+        "eval_count": data["usage"].get("output_tokens", 0),
+        "prompt_eval_count": data["usage"].get("input_tokens", 0),
+    }
+
+    return text, usage
+
+async def call_ollama(
+    messages: list[dict],
+    config: Config,
+) -> tuple[str, dict]:
+    """
+    POST a chat request to the Ollama /api/chat endpoint.
+    """
+    url = f"{config.api_base_url}/api/chat"
+
+    payload = {
+        "model": config.model,
+        "messages": messages,
+        "stream": False,
+        "options": {
+            "temperature": config.temperature,
+            "num_predict": config.max_tokens,
+        },
+    }
+
+    async with httpx.AsyncClient(timeout=config.timeout) as client:
+        response = await client.post(url, json=payload)
+
+        if response.status_code != 200:
+            raise httpx.HTTPStatusError(
+                f"Ollama returned {response.status_code}: {response.text}",
+                request=response.request,
+                response=response,
+            )
+
+        data = response.json()
+
+    text: str = data["message"]["content"]
+
+    usage: dict = {
+        "eval_count": data.get("eval_count", 0),
+        "prompt_eval_count": data.get("prompt_eval_count", 0),
+    }
+
+    return text, usage
+
+
+async def call_llm(
+    messages: list[dict],
+    config: Config,
+) -> tuple[str, dict]:
+    """
+    Route to Anthropic or Ollama based on config.
+    Use this instead of calling call_ollama directly.
+    """
+    if config.anthropic_api_key:
+        return await call_anthropic(messages, config)
+    return await call_ollama(messages, config)
+=== ./src/memory.py ===
+import json
+import os
+from datetime import datetime, timezone
+import logging
+logger = logging.getLogger(__name__)
+import numpy as np
+
+
+MEMORY_PATH = os.path.join("data", "memory.json")
+
+from dataclasses import dataclass, asdict
+from typing import Optional
+
+
+@dataclass
+class Note:
+    text: str
+    tag: Optional[str]
+    timestamp: str
+
+    def to_dict(self):
+        return asdict(self)
+    
+    @classmethod
+    def from_dict(cls, d):
+        return cls(text=d["text"], tag=d["tag"], timestamp=d["timestamp"])
+
+# ═══════════════════════════════════════════════════════════════
+# HELPER — lives outside the class because it doesn't need state
+# ═══════════════════════════════════════════════════════════════
+
+def parse_note(text):
+    """
+    Extract tag from note text if present.
+    Format: [tag] note text
+    Returns: (tag, clean_text)
+    """
+    text = text.strip()
+    tag = None
+
+    if text.startswith("[") and "]" in text:
+        closing = text.find("]")
+        tag = text[1:closing].strip()
+        if not tag:
+            tag = None
+        text = text[closing + 1:].strip()
+
+    return tag, text
+
+
+def format_note_display(note):
+    """
+    Format a single note dict as a display string.
+    Output: "[tag] Feb 23, 02:30 PM — note text"
+    If no tag, omits the tag portion entirely.
+    """
+    text = note.get("text", "")
+    tag = note.get("tag")
+    timestamp = note.get("timestamp")
+    dt = datetime.fromisoformat(timestamp)
+    formatted_time = dt.strftime("%b %d, %I:%M %p")
+    if tag:
+        return f"[{tag}] {formatted_time} — {text}"
+    else:
+        return f"{formatted_time} — {text}"
+
+
+# ═══════════════════════════════════════════════════════════════
+# MEMORY CLASS
+# ═══════════════════════════════════════════════════════════════
+
+from contextlib import contextmanager
+@contextmanager
+def managed_save(memory_instance):
+    yield
+    memory_instance._save()
+    
+class Memory:
+    """
+    Manages all note storage. Loads from disk once on creation;
+    all reads use self.data in memory. Writes to disk only when
+    data actually changes.
+    """
+
+    def __init__(self):
+        os.makedirs("data", exist_ok=True)
+        self.data = self._load()
+
+    # ── Internal I/O ──────────────────────────────────────────
+
+    def _load(self):
+        """Read from disk. Only called in __init__."""
+        if not os.path.exists(MEMORY_PATH):
+            return {"notes": []}
+        try:
+            with open(MEMORY_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            logger.warning("memory.json is corrupted. Starting with empty memory.")            
+            return {"notes": []}
+
+    def _save(self):
+        """Write current state to disk. Called after any mutation."""
+        try:
+            with open(MEMORY_PATH, "w", encoding="utf-8") as f:
+                json.dump(self.data, f, indent=2, ensure_ascii=False)
+        except OSError as e:
+            logger.warning("Could not save memory: %s", e)
+
+    # ── Core note operations ───────────────────────────────────
+
+    def add_note(self, text):
+        """Add a new note to memory with optional tag."""
+        tag, clean_text = parse_note(text)
+        self.data["notes"].append({
+            "text": clean_text,
+            "tag": tag,
+            "timestamp": datetime.now().isoformat(timespec="seconds")
+        })
+        self._save()
+
+    def list_notes(self, limit=10):
+        """Return the most recent N notes."""
+        return self.data["notes"][-limit:]
+
+    def delete_last_note(self):
+        with managed_save(self):
+            notes = self.data["notes"]
+            if not notes:
+                return None
+            return notes.pop()
+
+    def delete_all_notes(self):
+        """Delete all notes. Returns count deleted, or None if already empty."""
+        notes = self.data["notes"]
+        if not notes:
+            return None
+        count = len(notes)
+        self.data["notes"] = []
+        self._save()
+        return count
+
+    # ── Search and filtering ───────────────────────────────────
+
+    def retrieve(self, query: str, top_k: int = 5, decay: float =0.01) -> list:
+        """
+        Retrieve top-k notes using the Generative Agents scoring formula:
+        score = recency + importance + relevance
+
+        ALL three components are normalized to [0, 1] before summing.
+        """
+
+        notes = self.data["notes"]
+        if not notes:
+            return []
+        
+        q = query.lower().strip()
+        n = len(notes)
+
+        # ── 1. Recency scores ─────────────────────────────────────
+        now = datetime.now()
+        hours_elapsed = np.array([
+            (now - datetime.fromisoformat(note["timestamp"])).total_seconds() / 3600
+            for note in notes
+        ])
+        recency_scores = np.exp(-decay * hours_elapsed)
+
+        # ── 2. Importance scores ──────────────────────────────────
+        importance_scores = np.array([
+            1.0 if note.get("tag") else 0.5
+            for note in notes
+        ])
+
+        # ── 3. Relevance scores ───────────────────────────────────
+        raw_relevance = np.array([
+            note["text"].lower().count(q) * 2 +
+            (5 if q in note["text"].lower().split() else 0) +
+            (15 if note.get("tag") and q in note["tag"].lower() else 0)
+            for note in notes
+        ])
+        max_rel = raw_relevance.max()
+        relevance_scores = raw_relevance / max_rel if max_rel > 0 else np.zeros(n)
+
+        # ── 4. Combine and rank ───────────────────────────────────
+        combined = recency_scores + importance_scores + relevance_scores
+        top_indices = combined.argsort()[::-1][:top_k]
+
+        return [notes[i] for i in top_indices]
+
+    def get_all_tags(self):
+        """Return a sorted list of all unique tags."""
+        tags = set()
+        for note in self.data["notes"]:
+            tag = note.get("tag")
+            if tag:
+                tags.add(tag)
+        return sorted(tags)
+
+    def notes_by_tag(self, query):
+        """Return all notes with a specific tag."""
+        tag_lower = query.lower().strip()
+        return [
+            note for note in self.data["notes"]
+            if note.get("tag") and note["tag"].lower() == tag_lower
+        ]
+
+    # ── Export methods ─────────────────────────────────────────
+
+    def _filter_notes(self, tag=None):
+        """
+        Return notes filtered by tag (or all notes if tag is None).
+        Internal helper shared by all export methods.
+        """
+        notes = self.data["notes"]
+        if tag:
+            return [n for n in notes if n.get("tag") and n["tag"].lower() == tag.lower()]
+        return notes
+
+    def export_to_markdown(self, tag=None):
+        """
+        Export notes to a markdown file.
+        If tag is provided, only export notes with that tag.
+        Returns: (filename, count) tuple.
+
+        BUGS FIXED:
+        - datetime.now.strftime → datetime.now().strftime (was missing call parens)
+        - Tagged notes section now actually writes to content (was built but never output)
+        """
+        notes = self._filter_notes(tag)
+
+        if tag:
+            filename = f"{tag}_notes_{datetime.now().strftime('%Y-%m-%d')}.md"
+        else:
+            filename = f"notes_backup_{datetime.now().strftime('%Y-%m-%d')}.md"
+
+        if not notes:
+            return None, 0
+
+        content = "# JARVIS Notes Export\n\n"
+        content += f"**Exported:** {datetime.now().strftime('%B %d, %Y at %I:%M %p')}\n"
+        content += f"**Total Notes:** {len(notes)}\n\n"
+        content += "---\n\n"
+
+        # Group by tag
+        tagged_notes = {}
+        untagged_notes = []
+
+        for note in notes:
+            tag_name = note.get("tag")
+            if tag_name:
+                if tag_name not in tagged_notes:
+                    tagged_notes[tag_name] = []
+                tagged_notes[tag_name].append(note)
+            else:
+                untagged_notes.append(note)
+
+        # Write tagged sections
+        for tag_name, tag_group in tagged_notes.items():
+            content += f"## [{tag_name}]\n\n"
+            for note in tag_group:
+                timestamp = datetime.fromisoformat(note['timestamp']).strftime('%b %d, %I:%M %p')
+                content += f"**{timestamp}**\n{note['text']}\n\n"
+
+        # Write untagged section
+        if untagged_notes:
+            content += "## Untagged Notes\n\n"
+            for note in untagged_notes:
+                timestamp = datetime.fromisoformat(note['timestamp']).strftime('%b %d, %I:%M %p')
+                content += f"**{timestamp}**\n{note['text']}\n\n"
+
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        return filename, len(notes)
+
+    def export_to_json(self, tag=None):
+        """
+        Export notes to a JSON file.
+        If tag is provided, only export notes with that tag.
+        Returns: (filename, count) tuple.
+        """
+        notes = self._filter_notes(tag)
+
+        if tag:
+            filename = f"{tag}_notes_{datetime.now().strftime('%Y-%m-%d')}.json"
+        else:
+            filename = f"notes_backup_{datetime.now().strftime('%Y-%m-%d')}.json"
+
+        if not notes:
+            return None, 0
+
+        export_data = {
+            "exported_at": datetime.now().isoformat(),
+            "note_count": len(notes),
+            "filter_tag": tag,
+            "notes": notes
+        }
+
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(export_data, f, indent=2, ensure_ascii=False)
+
+        return filename, len(notes)
+
+    def export_to_txt(self, tag=None):
+        """
+        Export notes to a plain text file.
+        If tag is provided, only export notes with that tag.
+        Returns: (filename, count) tuple
+        """
+        notes = self._filter_notes(tag)
+
+        if tag:
+            filename = f"{tag}_notes_{datetime.now().strftime('%Y-%m-%d')}.txt"
+        else:
+            filename = f"notes_backup_{datetime.now().strftime('%Y-%m-%d')}.txt"
+
+        if not notes:
+            return None, 0
+
+        header = (
+            "JARVIS NOTES EXPORT\n" +
+            "=" * 60 + "\n" +
+            f"Exported: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}\n" +
+            f"Total Notes: {len(notes)}\n" +
+            "=" * 60 + "\n\n"
+        )
+
+        note_lines = "".join(
+            f"{i}, {datetime.fromisoformat(note['timestamp']).strftime('%b %d, %I:%M %p')} - "
+            f"{'[' + note['tag'] + '] ' if note.get('tag') else ''}{note['text']}\n"
+            for i, note in enumerate(notes, 1)
+        )
+
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(header + note_lines)
+
+        return filename, len(notes)
+
+
+# ═══════════════════════════════════════════════════════════════
+# MODULE-LEVEL API
+# A single shared Memory instance. The functions below are thin
+# wrappers so main.py doesn't need to change its imports.
+# ═══════════════════════════════════════════════════════════════
+
+_memory = Memory()
+
+
+def load_memory():
+    """Return the raw data dict. Used by main.py for note count checks."""
+    return _memory.data
+
+def add_note(text):
+    _memory.add_note(text)
+
+def list_notes(limit=10):
+    return _memory.list_notes(limit)
+
+def search_notes(query):
+    return _memory.search_notes(query)
+
+def delete_last_note():
+    return _memory.delete_last_note()
+
+def delete_all_notes():
+    return _memory.delete_all_notes()
+
+def get_all_tags():
+    return _memory.get_all_tags()
+
+def notes_by_tag(query):
+    return _memory.notes_by_tag(query)
+
+def export_to_markdown(tag=None):
+    return _memory.export_to_markdown(tag)
+
+def export_to_json(tag=None):
+    return _memory.export_to_json(tag)
+
+def export_to_txt(tag=None):
+    return _memory.export_to_txt(tag)
+
+def retrieve(query, top_k=5, decay=0.01):
+    return _memory.retrieve(query, top_k, decay)
+=== ./src/prompts.py ===
+"""
+Prompts for multi-agent debate system.
+Each agent has a distinct role, personality, and reasoning style.
+
+Phase 3 change: Removed RESPONDING TO THE DISCUSSION attribution block
+from planner and engineer. Also changed context header from
+"Previous discussion:" to "Context:" and removed closing instructions
+to "reflect the discussion above." All three framing elements removed
+together to cleanly test whether citation behavior is prompt-dependent
+or emerges naturally from retrieval context.
+Skeptic and ethicist prompts unchanged — serve as within-experiment control.
+"""
+
+AGENT_PROMPTS = {
+    "planner": {
+        "system": (
+            "You are a strategic planner and project manager. Your role is to create actionable, "
+            "well-structured plans that break down complex problems into manageable steps. "
+            "You think sequentially, consider dependencies, anticipate resource needs, and "
+            "always connect high-level goals to concrete next actions. You are optimistic but "
+            "practical—you believe most problems can be solved with good planning."
+        ),
+        "user": (
+            "Topic: {topic}\n\n"
+            "{context_section}"
+            "Provide your strategic plan. Your plan should:\n"
+            "1. Define what success looks like for this topic\n"
+            "2. Identify key milestones and their dependencies\n"
+            "3. List resources or constraints to consider\n"
+            "4. Propose the single most important next step\n\n"
+            "Be specific and actionable."
+        )
+    },
+
+    "engineer": {
+        "system": (
+            "You are a pragmatic engineer and implementer. Your focus is on technical feasibility, "
+            "system architecture, and practical execution. You think in terms of prototypes, "
+            "modularity, testing, and iteration. You value simplicity over complexity and working "
+            "solutions over perfect designs. You often ask 'How would we actually build this?'"
+        ),
+        "user": (
+            "Topic: {topic}\n\n"
+            "{context_section}"
+            "Describe your engineering approach. Consider:\n"
+            "- What would a minimum viable prototype look like?\n"
+            "- What technical challenges need to be solved?\n"
+            "- How would you ensure reliability and testability?\n"
+            "- What tools, technologies, or architectures might be appropriate?\n\n"
+            "Be concrete."
+        )
+    },
+
+    "skeptic": {
+        "system": (
+            "You are a rigorous skeptic and devil's advocate. Your job is to pressure-test ideas, "
+            "identify hidden assumptions, and anticipate failure modes. You're not negative for the "
+            "sake of being negative—you genuinely want to make plans more robust by finding their "
+            "weak points before they fail in practice. You ask hard questions like 'What could go "
+            "wrong?', 'How do we know that's true?', and 'What are we not considering?'"
+        ),
+        "user": (
+            "Topic: {topic}\n\n"
+            "{context_section}"
+            "Critically examine the ideas and plans discussed so far. Identify:\n"
+            "- Unstated assumptions that might be wrong\n"
+            "- Potential failure modes or edge cases\n"
+            "- Risks that haven't been adequately addressed\n"
+            "- Evidence gaps—what don't we know that we should?\n\n"
+            "Be constructive in your skepticism. For each concern, briefly suggest how it might be "
+            "mitigated or what would need to be true for the plan to work."
+        )
+    },
+
+    "ethicist": {
+        "system": (
+            "You are an ethicist concerned with values, fairness, and human impact. You consider "
+            "both immediate consequences and long-term implications. You think about stakeholders "
+            "who might be affected but not represented, about power dynamics, about privacy and "
+            "autonomy, and about whether just because we can do something means we should. You "
+            "don't just raise concerns—you suggest how to align solutions with ethical principles."
+        ),
+        "user": (
+            "Topic: {topic}\n\n"
+            "{context_section}"
+            "Analyze this topic through an ethical lens. Consider:\n"
+            "- Who might benefit and who might be harmed (including indirect effects)?\n"
+            "- Are there fairness or equity concerns?\n"
+            "- What privacy, autonomy, or transparency issues arise?\n"
+            "- Are there precedents being set that matter?\n"
+            "- What safeguards or human oversight would be appropriate?\n\n"
+            "Don't just identify problems—suggest how to address them while still making progress."
+        )
+    }
+}
+
+
+def build_messages(agent_name: str, topic: str, context: str = "") -> list[dict]:
+    """
+    Build the messages list for an agent in the format expected by the LLM API.
+
+    Args:
+        agent_name: Name of the agent ("planner", "engineer", "skeptic", "ethicist")
+        topic: The debate topic
+        context: Previous debate context (empty string for first round)
+
+    Returns:
+        List of message dicts with "role" and "content" keys
+
+    Raises:
+        KeyError: If agent_name is not found in AGENT_PROMPTS
+    """
+    if agent_name not in AGENT_PROMPTS:
+        raise KeyError(f"Agent '{agent_name}' not found. Available agents: {list(AGENT_PROMPTS.keys())}")
+
+    prompts = AGENT_PROMPTS[agent_name]
+
+    context_section = f"Context:\n{context}\n\n" if context else ""
+
+    user_content = prompts["user"].format(
+        topic=topic,
+        context_section=context_section
+    )
+
+    messages = [
+        {"role": "system", "content": prompts["system"]},
+        {"role": "user", "content": user_content}
+    ]
+
+    return messages

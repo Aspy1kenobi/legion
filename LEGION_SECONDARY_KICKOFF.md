@@ -140,15 +140,30 @@ to know what ground has been covered)_
 - None yet
 
 **Findings Confirmed:**
-_(Any prior findings that were directly invoked and validated in this session)_
-- None yet
+Queries Answered This Session:
 
-**Conflicts or Ambiguities Surfaced:**
-_(Anything that came up that didn't cleanly match the documented findings —
-flag it here for the researcher to carry to the Primary if needed)_
-- None yet
+Confirmed prompts.py structure and build_messages() interface for Legion node prompts
+Reviewed goal_stack.py dual-state and sync/async boundary problems
+Reviewed dispatcher.py design including LegionNode.can_handle() and dispatch_all() concurrency
+Confirmed world_model.py nested lock deadlock in add_belief()/save() and _save_unlocked() fix
+Drafted 22-belief bootstrap set from kickoff doc content
+Confirmed Config.from_env() routing logic via llm_client.py review
+Advised on .env vs .env.template separation and key regeneration
+Reviewed first and second run outputs and diagnosed root causes
 
-**Last Query Received:**
-_(Paste the last question relayed to you, so next session has continuity if the
-researcher resumes mid-thread)_
-- None yet
+Findings Confirmed:
+
+Bootstrap beliefs must be atomic and single-claim for keyword retrieval to score precisely
+Nested asyncio lock acquisition in add_belief()/add_goal()/add_event()/update_goal_status() causes silent deadlock; _save_unlocked() pattern resolves it
+On first run planner was grounded via in-memory beliefs despite disk persistence failing
+Bootstrap working confirmed by qualitative shift in rejection reason between run 1 and run 2
+gap_can_handle_keyword belief is now live — child goal descriptions must contain capability keywords
+
+Conflicts or Ambiguities Surfaced:
+
+Skeptic is applying integration design standard to an analysis task — evaluator overreach confirmed
+Option A (goal decomposition) selected over Option B (challenge prompt patch) — not yet implemented
+
+Last Query Received:
+
+Skeptic rejecting planner output on integration grounds for an analysis-scoped goal. Decision: decompose into two sequential goals. Child goal descriptions need capability keywords for can_handle() routing. Implementation pending in next session.

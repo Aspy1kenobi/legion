@@ -129,12 +129,7 @@ If you notice drift: name it, reset, continue.
 
 ## Files to Load When Resuming Build Work
 ```bash
-cat src/llm_bridge.py
-cat src/llm_client.py
-cat src/agent_memory.py
-cat src/agents.py
-cat src/prompts.py
-cat src/legion/world_model.py
+dump_context.sh > session_context.txt
 ```
 
 ---
@@ -143,33 +138,58 @@ cat src/legion/world_model.py
 _This section is updated by the Primary at the end of each session. Replace it
 entirely with the new block before handing off to the researcher._
 
-Next Target: Implement goal decomposition for the architecture analysis goal. Replace the single seeded goal in run_loop.py with two sequential child goals:
+Next Target: Apply two fixes to run_loop.py and rerun:
 
-"analyze Legion architecture to identify the most critical missing capability for autonomous goal pursuit" — routes to planner via "analyze" keyword
-"design integration plan for Legion's most critical missing capability for autonomous goal pursuit" — routes to planner via "plan" keyword, depends_on goal 1
+Raise max_retries in ConsensusEngine instantiation:
 
-This exercises GoalStack.decompose() for the first time and resolves the skeptic overreach issue from the current run. The gap_can_handle_keyword belief confirmed keyword matching matters — child descriptions must contain planner capability keywords explicitly.
+pythonself.consensus = ConsensusEngine(self.wm, config, evaluative, max_retries=3)
+
+Add _abandon_orphaned_goals() method to RunLoop and call it in tick() after _run_consensus_on_completions():
+
+pythonasync def _abandon_orphaned_goals(self) -> None:
+    for goal in list(self.wm.goals.values()):
+        if goal.status != "pending":
+            continue
+        for dep_id in goal.depends_on:
+            dep = self.wm.goals.get(dep_id)
+            if dep and dep.status == "abandoned":
+                await self.wm.update_goal_status(goal.id, status="abandoned")
+                await self.wm.add_event(
+                    agent="run_loop",
+                    event_type="goal_escalated",
+                    content=(
+                        f"Goal abandoned: dependency {dep_id} was abandoned.\n"
+                        f"Blocked goal: {goal.description}"
+                    ),
+                    importance=0.9,
+                    goal_id=goal.id,
+                    tags=["orphaned", "escalation"],
+                )
+                self._log(f"Orphan abandoned: {goal.id}", goal.description[:60])
+Expected outcome after fixes: either planner succeeds within 3 attempts and both children complete cleanly, or child 1 is abandoned and child 2 is immediately orphan-abandoned, auto_halt triggers, no more infinite spinning.
 Completed this session:
 
- First live run — end-to-end pipeline confirmed working
- Diagnosed planner grounding failure — empty world model on first run
- Implemented bootstrap_beliefs() — 27 atomic beliefs seeded from kickoff doc
- Diagnosed and fixed nested asyncio lock deadlock in world_model.py — _save_unlocked() pattern applied to all four write methods
- Tracked down missing import/call for bootstrap in run_loop.py
- Confirmed bootstrap working — 27 beliefs persisting to disk
- Confirmed skeptic rejection reason has changed — planner now grounded in Legion architecture
+Created dump_context.sh for clean session handoffs
+Diagnosed and resolved repo root vs src/legion/ path confusion — src/legion/ is canonical, no duplicate files exist
+Anchored _WM_PATH to run_loop.py's file location — invocation directory no longer matters
+Implemented GoalStack.decompose() usage in run_loop.startup() — parent + 2 sequential children
+Implemented _maybe_complete_parent() in goal_stack.py — parent auto-completes when all children done, recursive for arbitrary depth
+Confirmed decomposition and sequential dependency working correctly
+Confirmed parent auto-completion working correctly (run 2 at 14:28)
+Identified max_retries=2 too low — skeptic rejecting planner twice on broad analysis goals
+Identified orphaned goal bug — abandoned goal leaves dependent children permanently pending, blocking auto_halt
 
 Pending:
 
- Implement decomposed goal seeding (next target above)
- Remove debug prints from bootstrap_beliefs.py once decomposition confirmed working
- Engineer node (procedural, capabilities: implement/code/test/build)
- Ethicist node (evaluative, add to ConsensusEngine evaluator pool)
- LLM-driven goal decomposition (Planner calls decompose() autonomously)
+Apply the two fixes above and confirm clean run to auto_halt
+Remove bootstrap print statements once pipeline stable
+Engineer node (procedural, capabilities: implement/code/test/build)
+Ethicist node (evaluative, add to ConsensusEngine evaluator pool)
+LLM-driven goal decomposition (Planner calls decompose() autonomously)
 
 Open Questions / Blockers:
 
-can_handle() keyword matching confirmed fragile — child goal descriptions must be authored carefully. Fuzzy match or embedding-based routing is the long-term fix.
-max_retries=2 may be too low for complex goals — monitor next run.
+Skeptic rejection rate is high on broad goals — may need prompt tuning or goal scoping adjustment after retry fix confirmed
+can_handle() keyword matching still fragile — monitor as goal descriptions evolve
 
 Last Query to Research Resource: None this session.

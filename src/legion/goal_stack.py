@@ -7,6 +7,7 @@ Responsibilities:
     - push / pop_next / peek — goal lifecycle management
     - Priority ordering — highest priority unblocked goal surfaces first
     - Decomposition — replace a goal with ordered child goals
+    - Parent completion — when all children complete, parent auto-completes
     - Status reporting — formatted snapshot for agent context injection
 
 Not responsible for:
@@ -116,8 +117,6 @@ class GoalStack:
             The claimed Goal, or None.
         """
         candidates = self.wm.get_pending_goals()
-        # Filter out goals already assigned to another node
-        # (get_pending_goals returns status=="pending", assigned_to may still be None)
         unassigned = [g for g in candidates if g.assigned_to is None]
 
         if not unassigned:
@@ -132,7 +131,6 @@ class GoalStack:
             importance=goal.priority,
             goal_id=goal.id,
         )
-        # Return the updated goal object
         return self.wm.goals[goal.id]
 
     async def complete(self, goal_id: str, result: str, node_id: str = "unknown") -> None:
@@ -142,6 +140,9 @@ class GoalStack:
         After marking complete, any goals that depend_on this goal_id
         become eligible for pop_next() automatically — no explicit unblocking
         needed because eligibility is computed dynamically in get_pending_goals().
+
+        Also propagates completion upward: if this goal has a parent and all
+        siblings are now complete, the parent is auto-completed too.
 
         Args:
             goal_id: ID of the goal to complete.
@@ -161,6 +162,9 @@ class GoalStack:
             importance=goal.priority,
             goal_id=goal_id,
         )
+
+        # Propagate completion upward if all siblings are done
+        await self._maybe_complete_parent(goal_id)
 
     async def fail(self, goal_id: str, reason: str, node_id: str = "unknown") -> None:
         """
@@ -197,8 +201,9 @@ class GoalStack:
         Replace a goal with an ordered list of child goals.
 
         The parent goal is marked "active" (it's not complete until all
-        children are). Children are created with sequential dependencies:
-        child[n] depends_on child[n-1], so they execute in order by default.
+        children are — see _maybe_complete_parent). Children are created
+        with sequential dependencies: child[n] depends_on child[n-1],
+        so they execute in order by default.
 
         To allow parallel execution, the caller should push subgoals manually
         with explicit depends_on instead of using decompose().
@@ -232,7 +237,8 @@ class GoalStack:
             created.append(child)
             prev_id = child.id
 
-        # Mark parent active — it tracks child completion, not direct execution
+        # Mark parent active — completion is handled by _maybe_complete_parent
+        # once all children finish, not by direct dispatch
         await self.wm.update_goal_status(goal_id, status="active")
         await self.wm.add_event(
             agent=source,
@@ -246,6 +252,49 @@ class GoalStack:
         )
 
         return created
+
+    # ── Parent completion propagation ─────────────────────────────────────────
+
+    async def _maybe_complete_parent(self, goal_id: str) -> None:
+        """
+        If goal_id has a parent, check whether all children of that parent
+        are complete. If so, mark the parent complete and propagate upward
+        recursively (handles arbitrarily deep decomposition trees).
+
+        Called automatically at the end of complete(). Should not be called
+        directly by nodes or the dispatcher.
+        """
+        goal = self.wm.goals.get(goal_id)
+        if not goal or not goal.parent_id:
+            return
+
+        parent_id = goal.parent_id
+        if parent_id not in self.wm.goals:
+            return
+
+        siblings = [
+            g for g in self.wm.goals.values()
+            if g.parent_id == parent_id
+        ]
+
+        if not siblings:
+            return
+
+        if all(s.status == "complete" for s in siblings):
+            parent = self.wm.goals[parent_id]
+            await self.wm.update_goal_status(parent_id, status="complete")
+            await self.wm.add_event(
+                agent="goal_stack",
+                event_type="goal_complete",
+                content=(
+                    f"Parent goal auto-completed: all {len(siblings)} children finished.\n"
+                    f"Parent: {parent.description}"
+                ),
+                importance=parent.priority,
+                goal_id=parent_id,
+            )
+            # Recurse — parent may itself be a child of a grandparent
+            await self._maybe_complete_parent(parent_id)
 
     # ── Read path (sync) ──────────────────────────────────────────────────────
 

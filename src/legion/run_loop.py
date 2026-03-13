@@ -127,17 +127,22 @@ async def _planner_fn(goal, wm: SharedWorldModel) -> str:
 
 async def _engineer_fn(goal, wm: SharedWorldModel) -> str:
     """
-    Procedural node: produces concrete implementations, code, and prototypes.
-    Claims goals containing implement/build/code/write/develop/prototype/create.
-    Where the planner produces plans, the engineer produces artifacts.
+    Procedural node: produces concrete implementations, code, and artifacts.
+    Where the planner produces plans, the engineer produces things that can
+    be directly built or evaluated. Output must be substantive — no pass stubs.
     """
     from llm_client import call_llm
     from config import Config
 
     config     = Config()
     context    = wm.format_context_for_prompt(goal.description, top_k=4)
-    beliefs    = wm.get_active_beliefs(min_confidence=0.5)
-    belief_str = "\n".join(f"- {b.content}" for b in beliefs) or "(none yet)"
+    # Deliberately narrow belief injection: only the most relevant committed
+    # truths, not the full belief dump. Prevents the engineer from anchoring
+    # on a planner's verbose plan instead of its own goal.
+    relevant_beliefs = wm.retrieve_context(goal.description, top_k=3)
+    belief_str = "\n".join(
+        f"- [{e.agent}] {e.content[:200]}" for e in relevant_beliefs
+    ) or "(none yet)"
 
     messages = [
         {
@@ -146,28 +151,30 @@ async def _engineer_fn(goal, wm: SharedWorldModel) -> str:
                 "You are a pragmatic engineer in a multi-agent AI collective. "
                 "Your output will be reviewed by an evaluative agent before being "
                 "committed as a collective belief. Produce concrete, specific "
-                "artifacts: code, pseudocode, data structures, or step-by-step "
-                "implementation instructions. Do not produce abstract plans — "
-                "produce things that can be directly built or evaluated.\n\n"
-                "CODEBASE CONTEXT (read before producing any code):\n"
-                "- Language: Python 3.11, asyncio, no new dependencies without explicit justification\n"
-                "- LLM calls: use call_llm(messages, config) from llm_client.py — do NOT import torch, "
-                "transformers, or any ML library\n"
-                "- Node functions signature: async def fn(goal, wm: SharedWorldModel) -> str\n"
-                "- All persistence goes through wm.add_event() — do not write files directly\n"
-                "- Existing patterns are in run_loop.py: _planner_fn is the canonical example to follow"
+                "artifacts: working code, pseudocode with real logic, data structures, "
+                "or step-by-step implementation instructions with enough detail to build from.\n\n"
+                "HARD RULES:\n"
+                "- No pass stubs. If you cannot implement something fully, implement "
+                "the parts you can and explicitly state what remains and why.\n"
+                "- No abstract plans or process descriptions — that is the planner's job.\n"
+                "- Follow existing codebase patterns exactly:\n"
+                "  * Language: Python 3.11, asyncio\n"
+                "  * LLM calls: call_llm(messages, config) from llm_client.py\n"
+                "  * Node fn signature: async def fn(goal, wm: SharedWorldModel) -> str\n"
+                "  * Persistence: wm.add_event() only — no direct file writes\n"
+                "  * No new dependencies without explicit justification"
             ),
         },
         {
             "role": "user",
             "content": (
                 f"GOAL: {goal.description}\n\n"
-                f"COLLECTIVE BELIEFS (committed truths):\n{belief_str}\n\n"
-                f"RECENT COLLECTIVE ACTIVITY:\n{context or '(none)'}\n\n"
-                "Produce a concrete implementation or artifact to accomplish this goal. "
-                "Follow the codebase context above exactly. "
-                "If the goal involves Python code, write code that fits directly into the "
-                "existing codebase without new dependencies."
+                f"RELEVANT COLLECTIVE CONTEXT:\n{belief_str}\n\n"
+                f"RECENT ACTIVITY:\n{context or '(none)'}\n\n"
+                "Produce the implementation. If this involves Python code, write code "
+                "that fits directly into the existing codebase. If it involves a design "
+                "decision, produce a concrete spec with enough detail that an engineer "
+                "could implement it without asking follow-up questions."
             ),
         },
     ]
@@ -181,7 +188,6 @@ async def _engineer_fn(goal, wm: SharedWorldModel) -> str:
         goal_id=goal.id,
     )
     return result
-
 
 async def _skeptic_fn(goal, wm: SharedWorldModel) -> str:
     """
@@ -233,21 +239,69 @@ async def _skeptic_fn(goal, wm: SharedWorldModel) -> str:
     )
     return result
 
+async def _ethicist_fn(goal, wm: SharedWorldModel) -> str:
+    """
+    Evaluative node: assesses outputs for safety, fairness, and downstream risk.
+    Fires during consensus as a second challenger alongside the skeptic.
+    Where the skeptic finds logical failure modes, the ethicist asks whether
+    the output is safe to commit given its effects, precedents, and blind spots.
+    """
+    from llm_client import call_llm
+    from config import Config
+
+    config = Config()
+    # Self-retrieval mirrors the skeptic pattern — ethicist reads its own
+    # prior verdicts to maintain consistent evaluative stance across goals.
+    self_context  = wm.format_context_for_prompt(
+        goal.description, top_k=3, agent_filter="ethicist"
+    )
+    group_context = wm.format_context_for_prompt(goal.description, top_k=4)
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are an ethicist in a multi-agent AI collective. "
+                "Your job is to assess whether outputs are safe to commit as "
+                "collective beliefs — not just whether they are logically correct, "
+                "but whether acting on them could cause harm, entrench bad precedents, "
+                "or affect stakeholders who aren't represented in the discussion.\n\n"
+                "You are not a blocker. You accept good work. You reject or flag work "
+                "that has unexamined downstream effects, privacy implications, fairness "
+                "problems, or that would make the collective harder to oversee or correct.\n\n"
+                "You must respond with a single JSON object and nothing else:\n"
+                '{"verdict": "accept" | "reject", "reason": "<one sentence>", '
+                '"confidence": <float 0.0-1.0>}'
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"GOAL: {goal.description}\n\n"
+                f"YOUR PRIOR ETHICAL ASSESSMENTS ON RELATED TOPICS:\n"
+                f"{self_context or '(none)'}\n\n"
+                f"COLLECTIVE ACTIVITY:\n{group_context or '(none)'}\n\n"
+                "Assess whether this goal and its approach are safe to commit. Consider:\n"
+                "- Who could be affected by this, including indirectly?\n"
+                "- Does this set a precedent that limits future human oversight?\n"
+                "- Are there privacy, autonomy, or transparency concerns?\n"
+                "- Is there anything here that should require human review before acting?\n\n"
+                "Respond with JSON only."
+            ),
+        },
+    ]
+
+    result, _ = await call_llm(messages, config)
+    await wm.add_event(
+        agent="ethicist",
+        event_type="node_output",
+        content=result,
+        importance=goal.priority,
+        goal_id=goal.id,
+    )
+    return result
 
 def _build_default_nodes() -> list[LegionNode]:
-    """
-    Construct the default Legion node pool.
-
-    Capability vocabulary is partitioned deliberately:
-        planner   — strategic/structural verbs: plan, decompose, analyze, design, define, structure
-        engineer  — execution verbs: implement, build, code, test, integrate, write, develop,
-                    prototype, create
-        skeptic   — evaluative verbs: review, evaluate, assess, check, verify, challenge, audit
-
-    Overlap between planner and engineer was the routing bug from the previous session.
-    Keep these lists disjoint. If a new verb could belong to either, assign it to engineer
-    (engineer is the executor; planner is the strategist).
-    """
     return [
         LegionNode(
             name="planner",
@@ -268,6 +322,12 @@ def _build_default_nodes() -> list[LegionNode]:
             capabilities=["review", "evaluate", "assess", "check",
                           "verify", "challenge", "audit"],
             fn=_skeptic_fn,
+        ),
+        LegionNode(
+            name="ethicist",
+            role_type="evaluative",
+            capabilities=["ethics", "safety", "fairness", "oversight"],
+            fn=_ethicist_fn,
         ),
     ]
 
@@ -319,25 +379,30 @@ async def _run_strategist(wm: SharedWorldModel, gs: GoalStack) -> int:
     GAP_GOALS: list[tuple[str, str]] = [
         (
             "gap_can_handle_keyword",
-            "Implement a cosine-similarity alternative to keyword matching in "
-            "LegionNode.can_handle() using sentence embeddings, with a fallback "
-            "to the existing keyword path when embeddings are unavailable.",
+            "Implement an updated LegionNode.can_handle() method body in "
+            "dispatcher.py that uses cosine similarity between the goal "
+            "description and capability strings, with a keyword-match fallback "
+            "when sentence-transformers is unavailable. Return bool. "
+            "No changes to the LegionNode dataclass signature.",
         ),
         (
             "gap_engineer_node_missing",
-            # Goal description kept narrow: produce only the async function body
-            # and the LegionNode registration line — no ML model classes, no
-            # new dependencies. The implementation target is run_loop.py in a
-            # Python 3.11 asyncio codebase that calls call_llm() from llm_client.py.
-            "Write the async _engineer_fn(goal, wm) function body for run_loop.py "
-            "that calls call_llm() with an engineer system prompt and returns the "
-            "result string, following the same pattern as _planner_fn. "
-            "Also write the LegionNode(...) registration line for _build_default_nodes().",
+            "Implement the async _engineer_fn(goal, wm: SharedWorldModel) -> str "
+            "function body for run_loop.py. Call call_llm(messages, config) with "
+            "an engineer system prompt. Follow _planner_fn exactly as the pattern: "
+            "build messages list, call call_llm, call wm.add_event, return result. "
+            "Also write the LegionNode registration line for _build_default_nodes().",
         ),
         (
             "gap_ethicist_node_missing",
-            "Design the system prompt and evaluative criteria for an Ethicist node "
-            "that can serve as a second evaluator in ConsensusEngine alongside Skeptic.",
+            "Implement the async _ethicist_fn(goal, wm: SharedWorldModel) -> str "
+            "function body for run_loop.py. Follow _skeptic_fn as the pattern but "
+            "with an ethicist system prompt focused on safety, fairness, and human "
+            "oversight. Output must be JSON: "
+            "{\"verdict\": \"accept\"|\"reject\", \"reason\": \"<one sentence>\", "
+            "\"confidence\": <float>}. "
+            "Register as role_type='evaluative', "
+            "capabilities=['ethics', 'safety', 'fairness', 'oversight'].",
         ),
     ]
 

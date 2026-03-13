@@ -5,8 +5,8 @@
       "content": "world_model.py is built and operational.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.351643",
-      "updated_at": "2026-03-12T19:15:00.351643",
+      "created_at": "2026-03-13T09:41:29.536224",
+      "updated_at": "2026-03-13T09:41:29.536224",
       "tags": [
         "bootstrap"
       ],
@@ -17,8 +17,8 @@
       "content": "goal_stack.py is built and operational.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.351785",
-      "updated_at": "2026-03-12T19:15:00.351785",
+      "created_at": "2026-03-13T09:41:29.536388",
+      "updated_at": "2026-03-13T09:41:29.536388",
       "tags": [
         "bootstrap"
       ],
@@ -29,8 +29,8 @@
       "content": "dispatcher.py is built and operational.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.351906",
-      "updated_at": "2026-03-12T19:15:00.351906",
+      "created_at": "2026-03-13T09:41:29.536513",
+      "updated_at": "2026-03-13T09:41:29.536513",
       "tags": [
         "bootstrap"
       ],
@@ -41,8 +41,8 @@
       "content": "consensus.py is built and operational.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.352022",
-      "updated_at": "2026-03-12T19:15:00.352022",
+      "created_at": "2026-03-13T09:41:29.536627",
+      "updated_at": "2026-03-13T09:41:29.536627",
       "tags": [
         "bootstrap"
       ],
@@ -53,8 +53,8 @@
       "content": "run_loop.py is built and operational.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.352140",
-      "updated_at": "2026-03-12T19:15:00.352140",
+      "created_at": "2026-03-13T09:41:29.536744",
+      "updated_at": "2026-03-13T09:41:29.536744",
       "tags": [
         "bootstrap"
       ],
@@ -65,8 +65,8 @@
       "content": "goal_stack.py has no LLM-driven decomposition. Callers provide subgoal descriptions manually.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.352266",
-      "updated_at": "2026-03-12T19:15:00.352266",
+      "created_at": "2026-03-13T09:41:29.536865",
+      "updated_at": "2026-03-13T09:41:29.536865",
       "tags": [
         "bootstrap"
       ],
@@ -77,8 +77,8 @@
       "content": "GPT-2 zero-shot scored 0%. It generates shape, not logic.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.352529",
-      "updated_at": "2026-03-12T19:15:00.352529",
+      "created_at": "2026-03-13T09:41:29.536996",
+      "updated_at": "2026-03-13T09:41:29.536996",
       "tags": [
         "bootstrap"
       ],
@@ -89,8 +89,8 @@
       "content": "Two-agent debate scored 53% with hint injection.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.352681",
-      "updated_at": "2026-03-12T19:15:00.352681",
+      "created_at": "2026-03-13T09:41:29.537281",
+      "updated_at": "2026-03-13T09:41:29.537281",
       "tags": [
         "bootstrap"
       ],
@@ -101,8 +101,8 @@
       "content": "Exp 2 full pipeline was built but has not been run.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.352836",
-      "updated_at": "2026-03-12T19:15:00.352836",
+      "created_at": "2026-03-13T09:41:29.537427",
+      "updated_at": "2026-03-13T09:41:29.537427",
       "tags": [
         "bootstrap"
       ],
@@ -113,8 +113,8 @@
       "content": "Evaluative agents (Skeptic, Ethicist) self-correct via memory retrieval unprompted.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.353002",
-      "updated_at": "2026-03-12T19:15:00.353002",
+      "created_at": "2026-03-13T09:41:29.537583",
+      "updated_at": "2026-03-13T09:41:29.537583",
       "tags": [
         "bootstrap"
       ],
@@ -125,8 +125,8 @@
       "content": "Procedural agents (Planner, Engineer) collapse without attribution scaffolding.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.353285",
-      "updated_at": "2026-03-12T19:15:00.353285",
+      "created_at": "2026-03-13T09:41:29.537823",
+      "updated_at": "2026-03-13T09:41:29.537823",
       "tags": [
         "bootstrap"
       ],
@@ -137,8 +137,8 @@
       "content": "Standard coverage metrics are broken for multi-agent eval. Task pass rate is the correct measure.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.353680",
-      "updated_at": "2026-03-12T19:15:00.353680",
+      "created_at": "2026-03-13T09:41:29.538111",
+      "updated_at": "2026-03-13T09:41:29.538111",
       "tags": [
         "bootstrap"
       ],
@@ -149,8 +149,8 @@
       "content": "Debate architecture is viable as a commit protocol.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.353969",
-      "updated_at": "2026-03-12T19:15:00.353969",
+      "created_at": "2026-03-13T09:41:29.538323",
+      "updated_at": "2026-03-13T09:41:29.538323",
       "tags": [
         "bootstrap"
       ],
@@ -161,8 +161,8 @@
       "content": "debate_async.py is the primary runner pattern. Async-first is the established approach.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.354235",
-      "updated_at": "2026-03-12T19:15:00.354235",
+      "created_at": "2026-03-13T09:41:29.538533",
+      "updated_at": "2026-03-13T09:41:29.538533",
       "tags": [
         "bootstrap"
       ],
@@ -173,8 +173,8 @@
       "content": "Memory is dual-layer: memory.py for persistent notes, agent_memory.py for episodic retrieval.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.354522",
-      "updated_at": "2026-03-12T19:15:00.354522",
+      "created_at": "2026-03-13T09:41:29.538748",
+      "updated_at": "2026-03-13T09:41:29.538748",
       "tags": [
         "bootstrap"
       ],
@@ -185,8 +185,8 @@
       "content": "Procedural vs evaluative role distinction changes agent behavior functionally, not cosmetically.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.354793",
-      "updated_at": "2026-03-12T19:15:00.354793",
+      "created_at": "2026-03-13T09:41:29.538970",
+      "updated_at": "2026-03-13T09:41:29.538970",
       "tags": [
         "bootstrap"
       ],
@@ -197,8 +197,8 @@
       "content": "Role identity must be present from first output. Adding it later degrades behavior.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.355139",
-      "updated_at": "2026-03-12T19:15:00.355139",
+      "created_at": "2026-03-13T09:41:29.539204",
+      "updated_at": "2026-03-13T09:41:29.539204",
       "tags": [
         "bootstrap"
       ],
@@ -209,8 +209,8 @@
       "content": "call_llm() routes to Anthropic or Ollama based on ANTHROPIC_API_KEY presence in config.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.355415",
-      "updated_at": "2026-03-12T19:15:00.355415",
+      "created_at": "2026-03-13T09:41:29.539446",
+      "updated_at": "2026-03-13T09:41:29.539446",
       "tags": [
         "bootstrap"
       ],
@@ -221,8 +221,8 @@
       "content": "Consensus uses challenge/accept: one node produces output, Skeptic gets one veto round.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.355719",
-      "updated_at": "2026-03-12T19:15:00.355719",
+      "created_at": "2026-03-13T09:41:29.539749",
+      "updated_at": "2026-03-13T09:41:29.539749",
       "tags": [
         "bootstrap"
       ],
@@ -233,8 +233,8 @@
       "content": "GoalStack.decompose() chains children sequentially by default. Parallel decomposition requires explicit depends_on.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.356046",
-      "updated_at": "2026-03-12T19:15:00.356046",
+      "created_at": "2026-03-13T09:41:29.540038",
+      "updated_at": "2026-03-13T09:41:29.540038",
       "tags": [
         "bootstrap"
       ],
@@ -245,8 +245,8 @@
       "content": "Primary hardware is M1 MacBook Air 8GB. No local training is possible on this hardware.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.356463",
-      "updated_at": "2026-03-12T19:15:00.356463",
+      "created_at": "2026-03-13T09:41:29.540318",
+      "updated_at": "2026-03-13T09:41:29.540318",
       "tags": [
         "bootstrap"
       ],
@@ -257,8 +257,8 @@
       "content": "Anthropic API is the current model provider. Cost is a real constraint on always-on operation.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.356936",
-      "updated_at": "2026-03-12T19:15:00.356936",
+      "created_at": "2026-03-13T09:41:29.540629",
+      "updated_at": "2026-03-13T09:41:29.540629",
       "tags": [
         "bootstrap"
       ],
@@ -269,8 +269,8 @@
       "content": "Target migration path is Anthropic now, Ollama plus local model when hardware allows.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.357445",
-      "updated_at": "2026-03-12T19:15:00.357445",
+      "created_at": "2026-03-13T09:41:29.541330",
+      "updated_at": "2026-03-13T09:41:29.541330",
       "tags": [
         "bootstrap"
       ],
@@ -281,8 +281,8 @@
       "content": "No node currently calls an LLM to decompose goals. Planner decomposition is not yet autonomous.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.357864",
-      "updated_at": "2026-03-12T19:15:00.357864",
+      "created_at": "2026-03-13T09:41:29.541741",
+      "updated_at": "2026-03-13T09:41:29.541741",
       "tags": [
         "bootstrap"
       ],
@@ -293,8 +293,8 @@
       "content": "LegionNode.can_handle() uses keyword matching. Subgoal descriptions must contain capability keywords or dispatch is skipped.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.358349",
-      "updated_at": "2026-03-12T19:15:00.358349",
+      "created_at": "2026-03-13T09:41:29.542290",
+      "updated_at": "2026-03-13T09:41:29.542290",
       "tags": [
         "bootstrap"
       ],
@@ -305,8 +305,8 @@
       "content": "No Engineer node exists. Goals requiring implementation, coding, or testing have no capable node.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.359206",
-      "updated_at": "2026-03-12T19:15:00.359206",
+      "created_at": "2026-03-13T09:41:29.542768",
+      "updated_at": "2026-03-13T09:41:29.542768",
       "tags": [
         "bootstrap"
       ],
@@ -317,211 +317,139 @@
       "content": "No Ethicist node exists. Consensus evaluator pool has only Skeptic.",
       "confidence": 1.0,
       "source": "bootstrap",
-      "created_at": "2026-03-12T19:15:00.359956",
-      "updated_at": "2026-03-12T19:15:00.359956",
+      "created_at": "2026-03-13T09:41:29.543165",
+      "updated_at": "2026-03-13T09:41:29.543165",
       "tags": [
         "bootstrap"
       ],
       "evidence": []
     },
-    "belief_goal_0000_191500": {
-      "id": "belief_goal_0000_191500",
-      "content": "Decomposed into 3 subgoals:\n  1. Analyze current gaps in self-monitoring capability\n  2. Design a health-check mechanism for Legion\n  3. Build a prototype reporting node status and goal queue depth",
+    "retry_count_goal_0000_094129": {
+      "id": "retry_count_goal_0000_094129",
+      "content": "1",
+      "confidence": 0.0,
+      "source": "consensus",
+      "created_at": "2026-03-13T09:42:09.672447",
+      "updated_at": "2026-03-13T09:42:09.672447",
+      "tags": [
+        "internal",
+        "retry_counter"
+      ],
+      "evidence": []
+    },
+    "belief_goal_0000_094129": {
+      "id": "belief_goal_0000_094129",
+      "content": "**Concrete Plan: Designing the Data Contract and Function Signature for LLM-driven Goal Decomposition**\n\n**Goal:** Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behavior when the LLM is unavailable.\n\n**Key Steps:**\n\n1. **Analyze the Existing Architecture:**\n\t* Review the current implementation of GoalStack.decompose() to understand its workflow and requirements.\n\t* Identify the LLM-driven decomposition process and its interaction with the GoalStack framework.\n\t* Update the collective knowledge to reflect the current state of the architecture.\n\t* **Dependencies:** GoalStack.decompose() implementation, collective knowledge (updated to reflect the current state of the architecture)\n2. **Determine the LLM-driven Decomposition Requirements:**\n\t* Define the input format for the LLM-driven decomposition process, including the expected structure and content of subgoal descriptions.\n\t* Determine the output schema, including the expected format and structure of the decomposed goals.\n\t* Identify the fallback behavior when the LLM is unavailable, including the alternative decomposition process or the fallback strategy.\n\t* **Dependencies:** Analyzed existing architecture, collective knowledge\n3. **Design the Data Contract:**\n\t* Create a data contract that defines the input format, output schema, and fallback behavior for the LLM-driven decomposition process.\n\t* Ensure the data contract is consistent with the collective knowledge and the existing architecture.\n\t* **Dependencies:** Determined LLM-driven decomposition requirements, analyzed existing architecture\n4. **Implement the Function Signature:**\n\t* Design a function signature that encapsulates the LLM-driven decomposition process, including the input format, output schema, and fallback behavior.\n\t* Ensure the function signature is consistent with the data contract and the collective knowledge.\n\t* **Dependencies:** Designed data contract, analyzed existing architecture\n5. **Test and Validate the Implementation:**\n\t* Test the implementation of the LLM-driven decomposition process to ensure it meets the requirements and produces the expected output.\n\t* Validate the implementation against the collective knowledge and the existing architecture.\n\t* **Dependencies:** Implemented function signature, designed data contract\n\n**Single Most Important Action to Take First:**\n\n**Action 1: Analyze the Existing Architecture**\n\nBefore designing the data contract and function signature, it's essential to analyze the current implementation of GoalStack.decompose() to understand its workflow and requirements. This will ensure that the new design is consistent with the existing architecture and meets the collective knowledge.",
       "confidence": 0.9,
       "source": "planner / verified by skeptic",
-      "created_at": "2026-03-12T19:15:17.409383",
-      "updated_at": "2026-03-12T19:15:17.409383",
+      "created_at": "2026-03-13T09:42:54.402456",
+      "updated_at": "2026-03-13T09:42:54.402456",
       "tags": [
-        "goal_0000_191500",
+        "goal_0000_094129",
         "consensus"
       ],
       "evidence": [
-        "The proposed output provides a clear decomposition of the goal into subgoals and a structured approach to addressing the self-monitoring capability for Legion."
+        "The proposed output provides a clear and structured plan for designing the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behavior when the LLM is unavailable."
       ]
     },
-    "belief_goal_0001_191512": {
-      "id": "belief_goal_0001_191512",
-      "content": "Decomposed into 3 subgoals:\n  1. Analyze current gaps in self-monitoring capability\n  2. Design a health-check mechanism for Legion\n  3. Build a prototype reporting node status and goal queue depth",
+    "belief_goal_0001_094254": {
+      "id": "belief_goal_0001_094254",
+      "content": "Based on the provided collective knowledge and the goal to design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), I will provide a concrete implementation.\n\n**Data Contract:**\n\nTo define the input format, output schema, and fallback behavior for the LLM-driven decomposition process, we can create a data contract. Let's define the following structures:\n\n* `SubgoalDescription`: a dictionary containing the subgoal description, including the capability keywords and any additional context.\n* `DecomposedGoal`: a dictionary containing the decomposed goal, including the subgoal description and any additional context.\n\nThe data contract can be represented as follows:\n```python\nimport json\n\nclass LLMDrivenDecompositionData:\n    def __init__(self, subgoal_description, fallback_behavior):\n        self.subgoal_description = subgoal_description\n        self.fallback_behavior = fallback_behavior\n\n    def to_json(self):\n        return json.dumps(self.__dict__)\n\n    @classmethod\n    def from_json(cls, json_string):\n        return cls(**json.loads(json_string))\n```\nThis data contract defines two main structures: `SubgoalDescription` and `DecomposedGoal`. The `SubgoalDescription` dictionary contains the subgoal description, including the capability keywords and any additional context. The `DecomposedGoal` dictionary contains the decomposed goal, including the subgoal description and any additional context.\n\n**Function Signature:**\n\nTo encapsulate the LLM-driven decomposition process, we can design a function signature that takes the following inputs:\n\n* `subgoal_description`: a dictionary containing the subgoal description\n* `fallback_behavior`: a dictionary containing the fallback behavior\n\nThe function signature can be represented as follows:\n```python\nasync def llm_driven_decomposition(subgoal_description, fallback_behavior, config):\n    # LLM-driven decomposition logic here\n    pass\n```\nThis function signature defines the input format for the LLM-driven decomposition process. The `subgoal_description` dictionary contains the subgoal description, and the `fallback_behavior` dictionary contains the fallback behavior.\n\n**Test and Validate the Implementation:**\n\nTo test and validate the implementation, we can create test cases that verify the correctness of the LLM-driven decomposition process. Let's create a test function that tests the implementation:\n```python\nimport unittest\n\nclass TestLLMDrivenDecomposition(unittest.TestCase):\n    def test_decomposition(self):\n        # Create a subgoal description\n        subgoal_description = {\n            \"capability\": [\"keyword1\", \"keyword",
+      "confidence": 0.9,
+      "source": "engineer / verified by skeptic",
+      "created_at": "2026-03-13T09:44:44.333921",
+      "updated_at": "2026-03-13T09:44:44.333921",
+      "tags": [
+        "goal_0001_094254",
+        "consensus"
+      ],
+      "evidence": [
+        "The proposed output provides a concrete implementation of the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behavior when the LLM is unavailable."
+      ]
+    },
+    "belief_goal_0002_094254": {
+      "id": "belief_goal_0002_094254",
+      "content": "**Concrete Plan: Designing the Data Contract and Function Signature for LLM-driven Goal Decomposition**\n\n**Goal:** Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behavior when the LLM is unavailable.\n\n**Key Steps:**\n\n1. **Analyze the Existing Architecture:**\n\t* Review the current implementation of GoalStack.decompose() to understand its workflow and requirements.\n\t* Identify the LLM-driven decomposition process and its interaction with the GoalStack framework.\n\t* Update the collective knowledge to reflect the current state of the architecture.\n\t* **Dependencies:** GoalStack.decompose() implementation, collective knowledge (updated to reflect the current state of the architecture)\n\t* Action 1: Review the GoalStack.decompose() implementation and identify key functions, variables, and dependencies.\n\t* Deliverable: Updated collective knowledge with detailed architecture review.\n2. **Determine the LLM-driven Decomposition Requirements:**\n\t* Define the input format for the LLM-driven decomposition process, including the expected structure and content of subgoal descriptions.\n\t* Determine the output schema, including the expected format and structure of the decomposed goals.\n\t* Identify the fallback behavior when the LLM is unavailable, including the alternative decomposition process or the fallback strategy.\n\t* **Dependencies:** Analyzed existing architecture, collective knowledge\n\t* Action 2: Conduct thorough analysis of the LLM-driven decomposition requirements and identify potential complexities.\n\t* Deliverable: Detailed requirements document outlining input format, output schema, and fallback behavior.\n3. **Design the Data Contract:**\n\t* Create a data contract that defines the input format, output schema, and fallback behavior for the LLM-driven decomposition process.\n\t* Ensure the data contract is consistent with the collective knowledge and the existing architecture.\n\t* **Dependencies:** Determined LLM-driven decomposition requirements, analyzed existing architecture\n\t* Action 3: Design a data contract that meets the LLM-driven decomposition requirements and is consistent with the collective knowledge and existing architecture.\n\t* Deliverable: Data contract document outlining input format, output schema, and fallback behavior.\n4. **Implement the Function Signature:**\n\t* Design a function signature that encapsulates the LLM-driven decomposition process, including the input format, output schema, and fallback behavior.\n\t* Ensure the function signature is consistent with the data contract and the collective knowledge.\n\t* **Dependencies:** Designed data contract, analyzed existing architecture\n\t* Action 4:",
+      "confidence": 0.9,
+      "source": "planner / verified by skeptic",
+      "created_at": "2026-03-13T09:45:00.417020",
+      "updated_at": "2026-03-13T09:45:00.417020",
+      "tags": [
+        "goal_0002_094254",
+        "consensus"
+      ],
+      "evidence": [
+        "The proposed output provides a concrete plan for designing the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), following the correct pattern and including all key steps."
+      ]
+    },
+    "belief_goal_0003_094254": {
+      "id": "belief_goal_0003_094254",
+      "content": "**Concrete Plan: Designing the Data Contract and Function Signature for LLM-driven Goal Decomposition**\n\n**Goal:** Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behavior when the LLM is unavailable.\n\n**Key Steps:**\n\n1. **Analyze the Existing Architecture:**\n\t* Review the current implementation of GoalStack.decompose() to understand its workflow and requirements.\n\t* Identify the LLM-driven decomposition process and its interaction with the GoalStack framework.\n\t* Update the collective knowledge to reflect the current state of the architecture.\n\t* **Dependencies:** GoalStack.decompose() implementation, collective knowledge (updated to reflect the current state of the architecture)\n\t* Action 1: Review the GoalStack.decompose() implementation and identify key functions, variables, and dependencies.\n\t* Deliverable: Updated collective knowledge with detailed architecture review.\n2. **Determine the LLM-driven Decomposition Requirements:**\n\t* Define the input format for the LLM-driven decomposition process, including the expected structure and content of subgoal descriptions.\n\t* Determine the output schema, including the expected format and structure of the decomposed goals.\n\t* Identify the fallback behavior when the LLM is unavailable, including the alternative decomposition process or the fallback strategy.\n\t* **Dependencies:** Analyzed existing architecture, collective knowledge\n\t* Action 2: Conduct thorough analysis of the LLM-driven decomposition requirements and identify potential complexities.\n\t* Deliverable: Detailed requirements document outlining input format, output schema, and fallback behavior.\n3. **Design the Data Contract:**\n\t* Create a data contract that defines the input format, output schema, and fallback behavior for the LLM-driven decomposition process.\n\t* Ensure the data contract is consistent with the collective knowledge and the existing architecture.\n\t* **Dependencies:** Determined LLM-driven decomposition requirements, analyzed existing architecture\n\t* Action 3: Design a data contract that meets the LLM-driven decomposition requirements and is consistent with the collective knowledge and existing architecture.\n\t* Deliverable: Data contract document outlining input format, output schema, and fallback behavior.\n4. **Implement the Function Signature:**\n\t* Design a function signature that encapsulates the LLM-driven decomposition process, including the input format, output schema, and fallback behavior.\n\t* Ensure the function signature is consistent with the data contract and the collective knowledge.\n\t* **Dependencies:** Designed data contract, analyzed existing architecture\n\t* Action 4:",
       "confidence": 0.95,
       "source": "planner / verified by skeptic",
-      "created_at": "2026-03-12T19:15:35.883475",
-      "updated_at": "2026-03-12T19:15:35.883475",
+      "created_at": "2026-03-13T09:46:17.282006",
+      "updated_at": "2026-03-13T09:46:17.282006",
       "tags": [
-        "goal_0001_191512",
+        "goal_0003_094254",
         "consensus"
       ],
       "evidence": [
-        "The proposed output decomposes the goal into three subgoals and is consistent with the collective context, demonstrating a clear understanding of the task."
-      ]
-    },
-    "belief_goal_0002_191512": {
-      "id": "belief_goal_0002_191512",
-      "content": "Design a health-check mechanism for Legion: Implement a self-monitoring capability that includes a health-check mechanism, with a prototype reporting node status and goal queue depth.",
-      "confidence": 0.95,
-      "source": "planner / verified by skeptic",
-      "created_at": "2026-03-12T19:15:55.112344",
-      "updated_at": "2026-03-12T19:15:55.112344",
-      "tags": [
-        "goal_0002_191512",
-        "consensus"
-      ],
-      "evidence": [
-        "The proposed output adequately accomplishes the goal of designing a health-check mechanism for Legion"
-      ]
-    },
-    "belief_goal_0003_191512": {
-      "id": "belief_goal_0003_191512",
-      "content": "[Engineer stub] Received implementation goal: Build a prototype reporting node status and goal queue depth\nPhase 1: Logging intent. Full implementation pending Phase 2 engineer build.\nWould produce: code, tests, and integration artifacts for this subgoal.",
-      "confidence": 0.99,
-      "source": "engineer / verified by skeptic",
-      "created_at": "2026-03-12T19:16:23.964360",
-      "updated_at": "2026-03-12T19:16:23.964360",
-      "tags": [
-        "goal_0003_191512",
-        "consensus"
-      ],
-      "evidence": [
-        "The proposed output aligns with the decomposed subgoals and the already committed beliefs, and it is clear that the goal is partially complete."
-      ]
-    },
-    "belief_goal_0004_191528": {
-      "id": "belief_goal_0004_191528",
-      "content": "Analyze current gaps in self-monitoring capability: Review current implementation of self-monitoring and identify gaps in functionality, including but not limited to, (1) lack of real-time monitoring, (2) limited scope of self-monitoring, and (3) absence of automated alerts for critical issues. \n\nBased on this analysis, identify the top 3 gaps and prioritize them for further development, ensuring alignment with the overall goals of the collective and the primary hardware constraints (e.g., limited local training capabilities, reliance on Anthropic API). \n\nAdditionally, consider the role of the Skeptic and Ethicist evaluative agents in self-monitoring and their potential impact on the overall collective behavior. \n\nAssess the benefits and drawbacks of integrating a health-check mechanism for Legion, including potential improvements to node reliability, scalability, and maintainability. \n\nConclude by recommending a course of action for addressing the identified gaps, including specific design and implementation details where necessary.",
-      "confidence": 0.99,
-      "source": "planner / verified by skeptic",
-      "created_at": "2026-03-12T19:16:35.060380",
-      "updated_at": "2026-03-12T19:16:35.060380",
-      "tags": [
-        "goal_0004_191528",
-        "consensus"
-      ],
-      "evidence": [
-        "The proposed output comprehensively addresses the goal of analyzing current gaps in self-monitoring capability, providing a clear and prioritized plan for further development."
-      ]
-    },
-    "belief_goal_0005_191528": {
-      "id": "belief_goal_0005_191528",
-      "content": "{'gaps': ['lack of real-time monitoring', 'limited scope of self-monitoring', 'absence of automated alerts for critical issues'], 'prioritized_gaps': ['lack of real-time monitoring', 'absence of automated alerts for critical issues', 'limited scope of self-monitoring'], 'recommended_action': 'Design a health-check mechanism with real-time monitoring, automated alerts for critical issues, and incremental scope expansion, ensuring alignment with the primary hardware constraints and overall collective goals.', 'integration_benefits': ['improved node reliability', 'enhanced scalability', 'better maintainability']}",
-      "confidence": 0.99,
-      "source": "planner / verified by skeptic",
-      "created_at": "2026-03-12T19:17:09.402185",
-      "updated_at": "2026-03-12T19:17:09.402185",
-      "tags": [
-        "goal_0005_191528",
-        "consensus"
-      ],
-      "evidence": [
-        "The proposed output recommends a solution that is aligned with the goal and the collective context, addressing specific gaps in the current self-monitoring capability and providing a clear recommended action."
-      ]
-    },
-    "belief_goal_0006_191528": {
-      "id": "belief_goal_0006_191528",
-      "content": "[Engineer stub] Received implementation goal: Build a prototype reporting node status and goal queue depth\nPhase 1: Logging intent. Full implementation pending Phase 2 engineer build.\nWould produce: code, tests, and integration artifacts for this subgoal.",
-      "confidence": 0.99,
-      "source": "engineer / verified by skeptic",
-      "created_at": "2026-03-12T19:17:19.101669",
-      "updated_at": "2026-03-12T19:17:19.101669",
-      "tags": [
-        "goal_0006_191528",
-        "consensus"
-      ],
-      "evidence": [
-        "The proposed output is sound and directly addresses the goal of building a prototype reporting node status and goal queue depth."
+        "The proposed output provides a clear and structured plan for designing the data contract and function signature for LLM-driven goal decomposition, including a detailed analysis of the existing architecture and a well-organized approach to determining the requirements and designing the data contract."
       ]
     }
   },
   "goals": {
-    "goal_0000_191500": {
-      "id": "goal_0000_191500",
-      "description": "Design and implement a self-monitoring capability for Legion: analyze current gaps, design a health-check mechanism, and build a prototype that reports node status and goal queue depth.",
+    "goal_0000_094129": {
+      "id": "goal_0000_094129",
+      "description": "Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behaviour when the LLM is unavailable.",
       "priority": 0.7,
       "status": "complete",
       "source": "human",
-      "created_at": "2026-03-12T19:15:00.362461",
-      "updated_at": "2026-03-12T19:17:11.430861",
+      "created_at": "2026-03-13T09:41:29.545237",
+      "updated_at": "2026-03-13T09:42:42.714848",
       "parent_id": null,
       "depends_on": [],
-      "assigned_to": "planner"
+      "assigned_to": "planner",
+      "closes_gap": null
     },
-    "goal_0001_191512": {
-      "id": "goal_0001_191512",
-      "description": "Analyze current gaps in self-monitoring capability",
-      "priority": 0.7,
+    "goal_0001_094254": {
+      "id": "goal_0001_094254",
+      "description": "Implement a cosine-similarity alternative to keyword matching in LegionNode.can_handle() using sentence embeddings, with a fallback to the existing keyword path when embeddings are unavailable.",
+      "priority": 0.6,
       "status": "complete",
-      "source": "planner",
-      "created_at": "2026-03-12T19:15:12.166176",
-      "updated_at": "2026-03-12T19:17:11.426031",
-      "parent_id": "goal_0000_191500",
+      "source": "strategist",
+      "created_at": "2026-03-13T09:42:54.408976",
+      "updated_at": "2026-03-13T09:43:37.340595",
+      "parent_id": null,
       "depends_on": [],
-      "assigned_to": "planner"
+      "assigned_to": "engineer",
+      "closes_gap": null
     },
-    "goal_0002_191512": {
-      "id": "goal_0002_191512",
-      "description": "Design a health-check mechanism for Legion",
-      "priority": 0.7,
+    "goal_0002_094254": {
+      "id": "goal_0002_094254",
+      "description": "Write the async _engineer_fn(goal, wm) function body for run_loop.py that calls call_llm() with an engineer system prompt and returns the result string, following the same pattern as _planner_fn. Also write the LegionNode(...) registration line for _build_default_nodes().",
+      "priority": 0.6,
       "status": "complete",
-      "source": "planner",
-      "created_at": "2026-03-12T19:15:12.171023",
-      "updated_at": "2026-03-12T19:15:49.294235",
-      "parent_id": "goal_0000_191500",
-      "depends_on": [
-        "goal_0001_191512"
-      ],
-      "assigned_to": "planner"
-    },
-    "goal_0003_191512": {
-      "id": "goal_0003_191512",
-      "description": "Build a prototype reporting node status and goal queue depth",
-      "priority": 0.7,
-      "status": "complete",
-      "source": "planner",
-      "created_at": "2026-03-12T19:15:12.172101",
-      "updated_at": "2026-03-12T19:15:57.127629",
-      "parent_id": "goal_0000_191500",
-      "depends_on": [
-        "goal_0002_191512"
-      ],
-      "assigned_to": "engineer"
-    },
-    "goal_0004_191528": {
-      "id": "goal_0004_191528",
-      "description": "Analyze current gaps in self-monitoring capability",
-      "priority": 0.7,
-      "status": "complete",
-      "source": "planner",
-      "created_at": "2026-03-12T19:15:28.721275",
-      "updated_at": "2026-03-12T19:16:16.572371",
-      "parent_id": "goal_0001_191512",
+      "source": "strategist",
+      "created_at": "2026-03-13T09:42:54.412858",
+      "updated_at": "2026-03-13T09:44:19.022726",
+      "parent_id": null,
       "depends_on": [],
-      "assigned_to": "planner"
+      "assigned_to": "planner",
+      "closes_gap": null
     },
-    "goal_0005_191528": {
-      "id": "goal_0005_191528",
-      "description": "Design a health-check mechanism for Legion",
-      "priority": 0.7,
+    "goal_0003_094254": {
+      "id": "goal_0003_094254",
+      "description": "Design the system prompt and evaluative criteria for an Ethicist node that can serve as a second evaluator in ConsensusEngine alongside Skeptic.",
+      "priority": 0.6,
       "status": "complete",
-      "source": "planner",
-      "created_at": "2026-03-12T19:15:28.727680",
-      "updated_at": "2026-03-12T19:16:59.519010",
-      "parent_id": "goal_0001_191512",
-      "depends_on": [
-        "goal_0004_191528"
-      ],
-      "assigned_to": "planner"
-    },
-    "goal_0006_191528": {
-      "id": "goal_0006_191528",
-      "description": "Build a prototype reporting node status and goal queue depth",
-      "priority": 0.7,
-      "status": "complete",
-      "source": "planner",
-      "created_at": "2026-03-12T19:15:28.730155",
-      "updated_at": "2026-03-12T19:17:11.421191",
-      "parent_id": "goal_0001_191512",
-      "depends_on": [
-        "goal_0005_191528"
-      ],
-      "assigned_to": "engineer"
+      "source": "strategist",
+      "created_at": "2026-03-13T09:42:54.423241",
+      "updated_at": "2026-03-13T09:46:00.461065",
+      "parent_id": null,
+      "depends_on": [],
+      "assigned_to": "planner",
+      "closes_gap": null
     }
   },
   "nodes": {
@@ -533,14 +461,11 @@
         "decompose",
         "analyze",
         "design",
-        "build",
-        "implement",
-        "create",
         "define",
         "structure"
       ],
-      "last_active": "2026-03-12T19:16:59.523029",
-      "tasks_completed": 5,
+      "last_active": "2026-03-13T09:46:00.465425",
+      "tasks_completed": 4,
       "status": "idle",
       "current_goal_id": null
     },
@@ -555,10 +480,11 @@
         "integrate",
         "write",
         "develop",
-        "prototype"
+        "prototype",
+        "create"
       ],
-      "last_active": "2026-03-12T19:17:11.439431",
-      "tasks_completed": 2,
+      "last_active": "2026-03-13T09:43:37.348038",
+      "tasks_completed": 1,
       "status": "idle",
       "current_goal_id": null
     },
@@ -570,13 +496,12 @@
         "evaluate",
         "assess",
         "check",
-        "test",
         "verify",
         "challenge",
         "audit"
       ],
-      "last_active": "2026-03-12T19:15:00.361754",
-      "tasks_completed": 7,
+      "last_active": "2026-03-13T09:41:29.544532",
+      "tasks_completed": 5,
       "status": "idle",
       "current_goal_id": null
     }
@@ -586,366 +511,211 @@
       "id": "evt_000001",
       "event_type": "goal_added",
       "agent": "human",
-      "content": "Goal added: Design and implement a self-monitoring capability for Legion: analyze current gaps, design a health-check mechanism, and build a prototype that reports node status and goal queue depth.",
+      "content": "Goal added: Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behaviour when the LLM is unavailable.",
       "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:00.363004",
-      "goal_id": "goal_0000_191500",
+      "timestamp": "2026-03-13T09:41:29.546087",
+      "goal_id": "goal_0000_094129",
       "tags": []
     },
     {
       "id": "evt_000002",
-      "event_type": "goal_added",
+      "event_type": "node_output",
       "agent": "planner",
-      "content": "Goal added: Analyze current gaps in self-monitoring capability",
+      "content": "**Concrete Plan: Designing the Data Contract and Function Signature for LLM-driven Goal Decomposition**\n\n**Goal:** Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behavior when the LLM is unavailable.\n\n**Key Steps:**\n\n1. **Analyze the Existing Architecture:**\n\t* Review the current implementation of GoalStack.decompose() to understand its workflow and requirements.\n\t* Identify the LLM-driven decomposition process and its interaction with the GoalStack framework.\n\t* Update the collective knowledge to reflect the current state of the architecture.\n2. **Determine the LLM-driven Decomposition Requirements:**\n\t* Define the input format for the LLM-driven decomposition process, including the expected structure and content of subgoal descriptions.\n\t* Determine the output schema, including the expected format and structure of the decomposed goals.\n\t* Identify the fallback behavior when the LLM is unavailable, including the alternative decomposition process or the fallback strategy.\n3. **Design the Data Contract:**\n\t* Create a data contract that defines the input format, output schema, and fallback behavior for the LLM-driven decomposition process.\n\t* Ensure the data contract is consistent with the collective knowledge and the existing architecture.\n4. **Implement the Function Signature:**\n\t* Design a function signature that encapsulates the LLM-driven decomposition process, including the input format, output schema, and fallback behavior.\n\t* Ensure the function signature is consistent with the data contract and the collective knowledge.\n5. **Test and Validate the Implementation:**\n\t* Test the implementation of the LLM-driven decomposition process to ensure it meets the requirements and produces the expected output.\n\t* Validate the implementation against the collective knowledge and the existing architecture.\n\n**Single Most Important Action to Take First:**\n\n**Action 1: Analyze the Existing Architecture**\n\nBefore designing the data contract and function signature, it's essential to analyze the current implementation of GoalStack.decompose() to understand its workflow and requirements. This will ensure that the new design is consistent with the existing architecture and meets the collective knowledge. By analyzing the existing architecture, we can:\n\n* Identify the LLM-driven decomposition process and its interaction with the GoalStack framework.\n* Determine the input format, output schema, and fallback behavior required for the LLM-driven decomposition process.\n* Update the collective knowledge to reflect the current state of the architecture.\n\n**Dependencies:**\n\n* GoalStack.decompose() implementation\n* Collective knowledge (updated to reflect the",
       "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:12.170481",
-      "goal_id": "goal_0001_191512",
+      "timestamp": "2026-03-13T09:41:59.433689",
+      "goal_id": "goal_0000_094129",
       "tags": []
     },
     {
       "id": "evt_000003",
-      "event_type": "goal_added",
+      "event_type": "goal_complete",
       "agent": "planner",
-      "content": "Goal added: Design a health-check mechanism for Legion",
+      "content": "Goal complete: Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behaviour when the LLM is unavailable.\nResult: **Concrete Plan: Designing the Data Contract and Function Signature for LLM-driven Goal Decomposition**\n\n**Goal:** Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behavior when the LLM is unavailable.\n\n**Key Steps:**\n\n1. **Analyze the Existing Architecture:**\n\t* Review the current implementation of GoalStack.decompose() to understand its workflow and requirements.\n\t* Identify the LLM-driven decomposition process and its interaction with the GoalStack framework.\n\t* Update the collective knowledge to reflect the current state of the architecture.\n2. **Determine the LLM-driven Decomposition Requirements:**\n\t* Define the input format for the LLM-driven decomposition process, including the expected structure and content of subgoal descriptions.\n\t* Determine the output schema, including the expected format and structure of the decomposed goals.\n\t* Identify the fallback behavior when the LLM is unavailable, including the alternative decomposition process or the fallback strategy.\n3. **Design the Data Contract:**\n\t* Create a data contract that defines the input format, output schema, and fallback behavior for the LLM-driven decomposition process.\n\t* Ensure the data contract is consistent with the collective knowledge and the existing architecture.\n4. **Implement the Function Signature:**\n\t* Design a function signature that encapsulates the LLM-driven decomposition process, including the input format, output schema, and fallback behavior.\n\t* Ensure the function signature is consistent with the data contract and the collective knowledge.\n5. **Test and Validate the Implementation:**\n\t* Test the implementation of the LLM-driven decomposition process to ensure it meets the requirements and produces the expected output.\n\t* Validate the implementation against the collective knowledge and the existing architecture.\n\n**Single Most Important Action to Take First:**\n\n**Action 1: Analyze the Existing Architecture**\n\nBefore designing the data contract and function signature, it's essential to analyze the current implementation of GoalStack.decompose() to understand its workflow and requirements. This will ensure that the new design is consistent with the existing architecture and meets the collective knowledge. By analyzing the existing architecture, we can:\n\n* Identify the LLM-driven decomposition process and its interaction with the GoalStack framework.\n* Determine the input format, output schema, and fallback behavior required for the LLM-driven decomposition process.\n* Update the collective knowledge to reflect the current state of the architecture.\n\n**Dependencies:**\n\n* GoalStack.decompose() implementation\n* Collective knowledge (updated to reflect the",
       "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:12.171568",
-      "goal_id": "goal_0002_191512",
+      "timestamp": "2026-03-13T09:41:59.435766",
+      "goal_id": "goal_0000_094129",
       "tags": []
     },
     {
       "id": "evt_000004",
-      "event_type": "goal_added",
-      "agent": "planner",
-      "content": "Goal added: Build a prototype reporting node status and goal queue depth",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:12.172650",
-      "goal_id": "goal_0003_191512",
-      "tags": []
+      "event_type": "belief_rejected",
+      "agent": "consensus",
+      "content": "Evaluator skeptic rejected output for: Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behaviour when the LLM is unavailable.\nReason: Lack of concrete details on input format, output schema, and fallback behavior, as well as a clear plan for testing and validation\nRetry 1/2",
+      "importance": 0.8,
+      "timestamp": "2026-03-13T09:42:09.688768",
+      "goal_id": "goal_0000_094129",
+      "tags": [
+        "rejection"
+      ]
     },
     {
       "id": "evt_000005",
-      "event_type": "goal_decomposed",
+      "event_type": "node_output",
       "agent": "planner",
-      "content": "Goal decomposed: Design and implement a self-monitoring capability for Legion: analyze current gaps, design a health-check mechanism, and build a prototype that reports node status and goal queue depth.\nInto 3 subgoals: Analyze current gaps in self-monitoring capability, Design a health-check mechanism for Legion, Build a prototype reporting node status and goal queue depth",
+      "content": "**Concrete Plan: Designing the Data Contract and Function Signature for LLM-driven Goal Decomposition**\n\n**Goal:** Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behavior when the LLM is unavailable.\n\n**Key Steps:**\n\n1. **Analyze the Existing Architecture:**\n\t* Review the current implementation of GoalStack.decompose() to understand its workflow and requirements.\n\t* Identify the LLM-driven decomposition process and its interaction with the GoalStack framework.\n\t* Update the collective knowledge to reflect the current state of the architecture.\n\t* **Dependencies:** GoalStack.decompose() implementation, collective knowledge (updated to reflect the current state of the architecture)\n2. **Determine the LLM-driven Decomposition Requirements:**\n\t* Define the input format for the LLM-driven decomposition process, including the expected structure and content of subgoal descriptions.\n\t* Determine the output schema, including the expected format and structure of the decomposed goals.\n\t* Identify the fallback behavior when the LLM is unavailable, including the alternative decomposition process or the fallback strategy.\n\t* **Dependencies:** Analyzed existing architecture, collective knowledge\n3. **Design the Data Contract:**\n\t* Create a data contract that defines the input format, output schema, and fallback behavior for the LLM-driven decomposition process.\n\t* Ensure the data contract is consistent with the collective knowledge and the existing architecture.\n\t* **Dependencies:** Determined LLM-driven decomposition requirements, analyzed existing architecture\n4. **Implement the Function Signature:**\n\t* Design a function signature that encapsulates the LLM-driven decomposition process, including the input format, output schema, and fallback behavior.\n\t* Ensure the function signature is consistent with the data contract and the collective knowledge.\n\t* **Dependencies:** Designed data contract, analyzed existing architecture\n5. **Test and Validate the Implementation:**\n\t* Test the implementation of the LLM-driven decomposition process to ensure it meets the requirements and produces the expected output.\n\t* Validate the implementation against the collective knowledge and the existing architecture.\n\t* **Dependencies:** Implemented function signature, designed data contract\n\n**Single Most Important Action to Take First:**\n\n**Action 1: Analyze the Existing Architecture**\n\nBefore designing the data contract and function signature, it's essential to analyze the current implementation of GoalStack.decompose() to understand its workflow and requirements. This will ensure that the new design is consistent with the existing architecture and meets the collective knowledge.",
       "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:12.174199",
-      "goal_id": "goal_0000_191500",
+      "timestamp": "2026-03-13T09:42:42.711495",
+      "goal_id": "goal_0000_094129",
       "tags": []
     },
     {
       "id": "evt_000006",
-      "event_type": "node_output",
-      "agent": "planner",
-      "content": "Decomposed into 3 subgoals:\n  1. Analyze current gaps in self-monitoring capability\n  2. Design a health-check mechanism for Legion\n  3. Build a prototype reporting node status and goal queue depth",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:12.174948",
-      "goal_id": "goal_0000_191500",
-      "tags": [
-        "decomposed"
-      ]
-    },
-    {
-      "id": "evt_000007",
       "event_type": "goal_complete",
       "agent": "planner",
-      "content": "Goal complete: Design and implement a self-monitoring capability for Legion: analyze current gaps, design a health-check mechanism, and build a prototype that reports node status and goal queue depth.\nResult: Decomposed into 3 subgoals:\n  1. Analyze current gaps in self-monitoring capability\n  2. Design a health-check mechanism for Legion\n  3. Build a prototype reporting node status and goal queue depth",
+      "content": "Goal complete: Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behaviour when the LLM is unavailable.\nResult: **Concrete Plan: Designing the Data Contract and Function Signature for LLM-driven Goal Decomposition**\n\n**Goal:** Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behavior when the LLM is unavailable.\n\n**Key Steps:**\n\n1. **Analyze the Existing Architecture:**\n\t* Review the current implementation of GoalStack.decompose() to understand its workflow and requirements.\n\t* Identify the LLM-driven decomposition process and its interaction with the GoalStack framework.\n\t* Update the collective knowledge to reflect the current state of the architecture.\n\t* **Dependencies:** GoalStack.decompose() implementation, collective knowledge (updated to reflect the current state of the architecture)\n2. **Determine the LLM-driven Decomposition Requirements:**\n\t* Define the input format for the LLM-driven decomposition process, including the expected structure and content of subgoal descriptions.\n\t* Determine the output schema, including the expected format and structure of the decomposed goals.\n\t* Identify the fallback behavior when the LLM is unavailable, including the alternative decomposition process or the fallback strategy.\n\t* **Dependencies:** Analyzed existing architecture, collective knowledge\n3. **Design the Data Contract:**\n\t* Create a data contract that defines the input format, output schema, and fallback behavior for the LLM-driven decomposition process.\n\t* Ensure the data contract is consistent with the collective knowledge and the existing architecture.\n\t* **Dependencies:** Determined LLM-driven decomposition requirements, analyzed existing architecture\n4. **Implement the Function Signature:**\n\t* Design a function signature that encapsulates the LLM-driven decomposition process, including the input format, output schema, and fallback behavior.\n\t* Ensure the function signature is consistent with the data contract and the collective knowledge.\n\t* **Dependencies:** Designed data contract, analyzed existing architecture\n5. **Test and Validate the Implementation:**\n\t* Test the implementation of the LLM-driven decomposition process to ensure it meets the requirements and produces the expected output.\n\t* Validate the implementation against the collective knowledge and the existing architecture.\n\t* **Dependencies:** Implemented function signature, designed data contract\n\n**Single Most Important Action to Take First:**\n\n**Action 1: Analyze the Existing Architecture**\n\nBefore designing the data contract and function signature, it's essential to analyze the current implementation of GoalStack.decompose() to understand its workflow and requirements. This will ensure that the new design is consistent with the existing architecture and meets the collective knowledge.",
       "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:12.189116",
-      "goal_id": "goal_0000_191500",
+      "timestamp": "2026-03-13T09:42:42.716427",
+      "goal_id": "goal_0000_094129",
       "tags": []
     },
     {
-      "id": "evt_000008",
+      "id": "evt_000007",
       "event_type": "belief_formed",
       "agent": "consensus",
-      "content": "Belief committed [challenged+accepted, confidence=0.90]: Design and implement a self-monitoring capability for Legion: analyze current gaps, design a health-check mechanism, and build a prototype that reports node status and goal queue depth.\nDecomposed into 3 subgoals:\n  1. Analyze current gaps in self-monitoring capability\n  2. Design a health-check mechanism for Legion\n  3. Build a prototype reporting node status and goal queue depth",
+      "content": "Belief committed [challenged+accepted, confidence=0.90]: Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behaviour when the LLM is unavailable.\n**Concrete Plan: Designing the Data Contract and Function Signature for LLM-driven Goal Decomposition**\n\n**Goal:** Design the data contract and function signature for LLM-driven goal decomposition in ...",
       "importance": 0.9,
-      "timestamp": "2026-03-12T19:15:17.410261",
-      "goal_id": "goal_0000_191500",
+      "timestamp": "2026-03-13T09:42:54.405653",
+      "goal_id": "goal_0000_094129",
       "tags": [
         "belief",
         "challenged+accepted"
       ]
     },
     {
+      "id": "evt_000008",
+      "event_type": "goal_added",
+      "agent": "strategist",
+      "content": "Goal added: Implement a cosine-similarity alternative to keyword matching in LegionNode.can_handle() using sentence embeddings, with a fallback to the existing keyword path when embeddings are unavailable.",
+      "importance": 0.6,
+      "timestamp": "2026-03-13T09:42:54.411038",
+      "goal_id": "goal_0001_094254",
+      "tags": []
+    },
+    {
       "id": "evt_000009",
       "event_type": "goal_added",
-      "agent": "planner",
-      "content": "Goal added: Analyze current gaps in self-monitoring capability",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:28.725953",
-      "goal_id": "goal_0004_191528",
+      "agent": "strategist",
+      "content": "Goal added: Write the async _engineer_fn(goal, wm) function body for run_loop.py that calls call_llm() with an engineer system prompt and returns the result string, following the same pattern as _planner_fn. Also write the LegionNode(...) registration line for _build_default_nodes().",
+      "importance": 0.6,
+      "timestamp": "2026-03-13T09:42:54.414576",
+      "goal_id": "goal_0002_094254",
       "tags": []
     },
     {
       "id": "evt_000010",
       "event_type": "goal_added",
-      "agent": "planner",
-      "content": "Goal added: Design a health-check mechanism for Legion",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:28.728881",
-      "goal_id": "goal_0005_191528",
+      "agent": "strategist",
+      "content": "Goal added: Design the system prompt and evaluative criteria for an Ethicist node that can serve as a second evaluator in ConsensusEngine alongside Skeptic.",
+      "importance": 0.6,
+      "timestamp": "2026-03-13T09:42:54.424885",
+      "goal_id": "goal_0003_094254",
       "tags": []
     },
     {
       "id": "evt_000011",
-      "event_type": "goal_added",
-      "agent": "planner",
-      "content": "Goal added: Build a prototype reporting node status and goal queue depth",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:28.731215",
-      "goal_id": "goal_0006_191528",
+      "event_type": "dispatch_skipped",
+      "agent": "dispatcher",
+      "content": "No capable idle node for: Design the system prompt and evaluative criteria for an Ethicist node that can serve as a second evaluator in ConsensusEngine alongside Skeptic.",
+      "importance": 0.3,
+      "timestamp": "2026-03-13T09:42:56.503192",
+      "goal_id": "goal_0003_094254",
       "tags": []
     },
     {
       "id": "evt_000012",
-      "event_type": "goal_decomposed",
-      "agent": "planner",
-      "content": "Goal decomposed: Analyze current gaps in self-monitoring capability\nInto 3 subgoals: Analyze current gaps in self-monitoring capability, Design a health-check mechanism for Legion, Build a prototype reporting node status and goal queue depth",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:28.745865",
-      "goal_id": "goal_0001_191512",
+      "event_type": "node_output",
+      "agent": "engineer",
+      "content": "Based on the provided collective knowledge and the goal to design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), I will provide a concrete implementation.\n\n**Data Contract:**\n\nTo define the input format, output schema, and fallback behavior for the LLM-driven decomposition process, we can create a data contract. Let's define the following structures:\n\n* `SubgoalDescription`: a dictionary containing the subgoal description, including the capability keywords and any additional context.\n* `DecomposedGoal`: a dictionary containing the decomposed goal, including the subgoal description and any additional context.\n\nThe data contract can be represented as follows:\n```python\nimport json\n\nclass LLMDrivenDecompositionData:\n    def __init__(self, subgoal_description, fallback_behavior):\n        self.subgoal_description = subgoal_description\n        self.fallback_behavior = fallback_behavior\n\n    def to_json(self):\n        return json.dumps(self.__dict__)\n\n    @classmethod\n    def from_json(cls, json_string):\n        return cls(**json.loads(json_string))\n```\nThis data contract defines two main structures: `SubgoalDescription` and `DecomposedGoal`. The `SubgoalDescription` dictionary contains the subgoal description, including the capability keywords and any additional context. The `DecomposedGoal` dictionary contains the decomposed goal, including the subgoal description and any additional context.\n\n**Function Signature:**\n\nTo encapsulate the LLM-driven decomposition process, we can design a function signature that takes the following inputs:\n\n* `subgoal_description`: a dictionary containing the subgoal description\n* `fallback_behavior`: a dictionary containing the fallback behavior\n\nThe function signature can be represented as follows:\n```python\nasync def llm_driven_decomposition(subgoal_description, fallback_behavior, config):\n    # LLM-driven decomposition logic here\n    pass\n```\nThis function signature defines the input format for the LLM-driven decomposition process. The `subgoal_description` dictionary contains the subgoal description, and the `fallback_behavior` dictionary contains the fallback behavior.\n\n**Test and Validate the Implementation:**\n\nTo test and validate the implementation, we can create test cases that verify the correctness of the LLM-driven decomposition process. Let's create a test function that tests the implementation:\n```python\nimport unittest\n\nclass TestLLMDrivenDecomposition(unittest.TestCase):\n    def test_decomposition(self):\n        # Create a subgoal description\n        subgoal_description = {\n            \"capability\": [\"keyword1\", \"keyword",
+      "importance": 0.6,
+      "timestamp": "2026-03-13T09:43:37.330255",
+      "goal_id": "goal_0001_094254",
       "tags": []
     },
     {
       "id": "evt_000013",
-      "event_type": "node_output",
-      "agent": "planner",
-      "content": "Decomposed into 3 subgoals:\n  1. Analyze current gaps in self-monitoring capability\n  2. Design a health-check mechanism for Legion\n  3. Build a prototype reporting node status and goal queue depth",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:28.746941",
-      "goal_id": "goal_0001_191512",
-      "tags": [
-        "decomposed"
-      ]
+      "event_type": "goal_complete",
+      "agent": "engineer",
+      "content": "Goal complete: Implement a cosine-similarity alternative to keyword matching in LegionNode.can_handle() using sentence embeddings, with a fallback to the existing keyword path when embeddings are unavailable.\nResult: Based on the provided collective knowledge and the goal to design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), I will provide a concrete implementation.\n\n**Data Contract:**\n\nTo define the input format, output schema, and fallback behavior for the LLM-driven decomposition process, we can create a data contract. Let's define the following structures:\n\n* `SubgoalDescription`: a dictionary containing the subgoal description, including the capability keywords and any additional context.\n* `DecomposedGoal`: a dictionary containing the decomposed goal, including the subgoal description and any additional context.\n\nThe data contract can be represented as follows:\n```python\nimport json\n\nclass LLMDrivenDecompositionData:\n    def __init__(self, subgoal_description, fallback_behavior):\n        self.subgoal_description = subgoal_description\n        self.fallback_behavior = fallback_behavior\n\n    def to_json(self):\n        return json.dumps(self.__dict__)\n\n    @classmethod\n    def from_json(cls, json_string):\n        return cls(**json.loads(json_string))\n```\nThis data contract defines two main structures: `SubgoalDescription` and `DecomposedGoal`. The `SubgoalDescription` dictionary contains the subgoal description, including the capability keywords and any additional context. The `DecomposedGoal` dictionary contains the decomposed goal, including the subgoal description and any additional context.\n\n**Function Signature:**\n\nTo encapsulate the LLM-driven decomposition process, we can design a function signature that takes the following inputs:\n\n* `subgoal_description`: a dictionary containing the subgoal description\n* `fallback_behavior`: a dictionary containing the fallback behavior\n\nThe function signature can be represented as follows:\n```python\nasync def llm_driven_decomposition(subgoal_description, fallback_behavior, config):\n    # LLM-driven decomposition logic here\n    pass\n```\nThis function signature defines the input format for the LLM-driven decomposition process. The `subgoal_description` dictionary contains the subgoal description, and the `fallback_behavior` dictionary contains the fallback behavior.\n\n**Test and Validate the Implementation:**\n\nTo test and validate the implementation, we can create test cases that verify the correctness of the LLM-driven decomposition process. Let's create a test function that tests the implementation:\n```python\nimport unittest\n\nclass TestLLMDrivenDecomposition(unittest.TestCase):\n    def test_decomposition(self):\n        # Create a subgoal description\n        subgoal_description = {\n            \"capability\": [\"keyword1\", \"keyword",
+      "importance": 0.6,
+      "timestamp": "2026-03-13T09:43:37.344767",
+      "goal_id": "goal_0001_094254",
+      "tags": []
     },
     {
       "id": "evt_000014",
-      "event_type": "goal_complete",
+      "event_type": "node_output",
       "agent": "planner",
-      "content": "Goal complete: Analyze current gaps in self-monitoring capability\nResult: Decomposed into 3 subgoals:\n  1. Analyze current gaps in self-monitoring capability\n  2. Design a health-check mechanism for Legion\n  3. Build a prototype reporting node status and goal queue depth",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:28.749002",
-      "goal_id": "goal_0001_191512",
+      "content": "**Concrete Plan: Designing the Data Contract and Function Signature for LLM-driven Goal Decomposition**\n\n**Goal:** Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behavior when the LLM is unavailable.\n\n**Key Steps:**\n\n1. **Analyze the Existing Architecture:**\n\t* Review the current implementation of GoalStack.decompose() to understand its workflow and requirements.\n\t* Identify the LLM-driven decomposition process and its interaction with the GoalStack framework.\n\t* Update the collective knowledge to reflect the current state of the architecture.\n\t* **Dependencies:** GoalStack.decompose() implementation, collective knowledge (updated to reflect the current state of the architecture)\n\t* Action 1: Review the GoalStack.decompose() implementation and identify key functions, variables, and dependencies.\n\t* Deliverable: Updated collective knowledge with detailed architecture review.\n2. **Determine the LLM-driven Decomposition Requirements:**\n\t* Define the input format for the LLM-driven decomposition process, including the expected structure and content of subgoal descriptions.\n\t* Determine the output schema, including the expected format and structure of the decomposed goals.\n\t* Identify the fallback behavior when the LLM is unavailable, including the alternative decomposition process or the fallback strategy.\n\t* **Dependencies:** Analyzed existing architecture, collective knowledge\n\t* Action 2: Conduct thorough analysis of the LLM-driven decomposition requirements and identify potential complexities.\n\t* Deliverable: Detailed requirements document outlining input format, output schema, and fallback behavior.\n3. **Design the Data Contract:**\n\t* Create a data contract that defines the input format, output schema, and fallback behavior for the LLM-driven decomposition process.\n\t* Ensure the data contract is consistent with the collective knowledge and the existing architecture.\n\t* **Dependencies:** Determined LLM-driven decomposition requirements, analyzed existing architecture\n\t* Action 3: Design a data contract that meets the LLM-driven decomposition requirements and is consistent with the collective knowledge and existing architecture.\n\t* Deliverable: Data contract document outlining input format, output schema, and fallback behavior.\n4. **Implement the Function Signature:**\n\t* Design a function signature that encapsulates the LLM-driven decomposition process, including the input format, output schema, and fallback behavior.\n\t* Ensure the function signature is consistent with the data contract and the collective knowledge.\n\t* **Dependencies:** Designed data contract, analyzed existing architecture\n\t* Action 4:",
+      "importance": 0.6,
+      "timestamp": "2026-03-13T09:44:19.012340",
+      "goal_id": "goal_0002_094254",
       "tags": []
     },
     {
       "id": "evt_000015",
+      "event_type": "goal_complete",
+      "agent": "planner",
+      "content": "Goal complete: Write the async _engineer_fn(goal, wm) function body for run_loop.py that calls call_llm() with an engineer system prompt and returns the result string, following the same pattern as _planner_fn. Also write the LegionNode(...) registration line for _build_default_nodes().\nResult: **Concrete Plan: Designing the Data Contract and Function Signature for LLM-driven Goal Decomposition**\n\n**Goal:** Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behavior when the LLM is unavailable.\n\n**Key Steps:**\n\n1. **Analyze the Existing Architecture:**\n\t* Review the current implementation of GoalStack.decompose() to understand its workflow and requirements.\n\t* Identify the LLM-driven decomposition process and its interaction with the GoalStack framework.\n\t* Update the collective knowledge to reflect the current state of the architecture.\n\t* **Dependencies:** GoalStack.decompose() implementation, collective knowledge (updated to reflect the current state of the architecture)\n\t* Action 1: Review the GoalStack.decompose() implementation and identify key functions, variables, and dependencies.\n\t* Deliverable: Updated collective knowledge with detailed architecture review.\n2. **Determine the LLM-driven Decomposition Requirements:**\n\t* Define the input format for the LLM-driven decomposition process, including the expected structure and content of subgoal descriptions.\n\t* Determine the output schema, including the expected format and structure of the decomposed goals.\n\t* Identify the fallback behavior when the LLM is unavailable, including the alternative decomposition process or the fallback strategy.\n\t* **Dependencies:** Analyzed existing architecture, collective knowledge\n\t* Action 2: Conduct thorough analysis of the LLM-driven decomposition requirements and identify potential complexities.\n\t* Deliverable: Detailed requirements document outlining input format, output schema, and fallback behavior.\n3. **Design the Data Contract:**\n\t* Create a data contract that defines the input format, output schema, and fallback behavior for the LLM-driven decomposition process.\n\t* Ensure the data contract is consistent with the collective knowledge and the existing architecture.\n\t* **Dependencies:** Determined LLM-driven decomposition requirements, analyzed existing architecture\n\t* Action 3: Design a data contract that meets the LLM-driven decomposition requirements and is consistent with the collective knowledge and existing architecture.\n\t* Deliverable: Data contract document outlining input format, output schema, and fallback behavior.\n4. **Implement the Function Signature:**\n\t* Design a function signature that encapsulates the LLM-driven decomposition process, including the input format, output schema, and fallback behavior.\n\t* Ensure the function signature is consistent with the data contract and the collective knowledge.\n\t* **Dependencies:** Designed data contract, analyzed existing architecture\n\t* Action 4:",
+      "importance": 0.6,
+      "timestamp": "2026-03-13T09:44:19.093670",
+      "goal_id": "goal_0002_094254",
+      "tags": []
+    },
+    {
+      "id": "evt_000016",
       "event_type": "belief_formed",
       "agent": "consensus",
-      "content": "Belief committed [challenged+accepted, confidence=0.95]: Analyze current gaps in self-monitoring capability\nDecomposed into 3 subgoals:\n  1. Analyze current gaps in self-monitoring capability\n  2. Design a health-check mechanism for Legion\n  3. Build a prototype reporting node status and goal queue depth",
-      "importance": 0.95,
-      "timestamp": "2026-03-12T19:15:35.884640",
-      "goal_id": "goal_0001_191512",
+      "content": "Belief committed [challenged+accepted, confidence=0.90]: Implement a cosine-similarity alternative to keyword matching in LegionNode.can_handle() using sentence embeddings, with a fallback to the existing keyword path when embeddings are unavailable.\nBased on the provided collective knowledge and the goal to design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), I will provide a concrete impleme...",
+      "importance": 0.9,
+      "timestamp": "2026-03-13T09:44:44.339168",
+      "goal_id": "goal_0001_094254",
       "tags": [
         "belief",
         "challenged+accepted"
       ]
     },
     {
-      "id": "evt_000016",
-      "event_type": "dispatch_skipped",
-      "agent": "dispatcher",
-      "content": "No capable idle node for: Analyze current gaps in self-monitoring capability",
-      "importance": 0.3,
-      "timestamp": "2026-03-12T19:15:37.942955",
-      "goal_id": "goal_0004_191528",
-      "tags": []
-    },
-    {
       "id": "evt_000017",
-      "event_type": "node_output",
-      "agent": "planner",
-      "content": "Design a health-check mechanism for Legion: Implement a self-monitoring capability that includes a health-check mechanism, with a prototype reporting node status and goal queue depth.",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:49.279055",
-      "goal_id": "goal_0002_191512",
-      "tags": []
+      "event_type": "belief_formed",
+      "agent": "consensus",
+      "content": "Belief committed [challenged+accepted, confidence=0.90]: Write the async _engineer_fn(goal, wm) function body for run_loop.py that calls call_llm() with an engineer system prompt and returns the result string, following the same pattern as _planner_fn. Also write the LegionNode(...) registration line for _build_default_nodes().\n**Concrete Plan: Designing the Data Contract and Function Signature for LLM-driven Goal Decomposition**\n\n**Goal:** Design the data contract and function signature for LLM-driven goal decomposition in ...",
+      "importance": 0.9,
+      "timestamp": "2026-03-13T09:45:00.420982",
+      "goal_id": "goal_0002_094254",
+      "tags": [
+        "belief",
+        "challenged+accepted"
+      ]
     },
     {
       "id": "evt_000018",
-      "event_type": "goal_complete",
+      "event_type": "node_output",
       "agent": "planner",
-      "content": "Goal complete: Design a health-check mechanism for Legion\nResult: Design a health-check mechanism for Legion: Implement a self-monitoring capability that includes a health-check mechanism, with a prototype reporting node status and goal queue depth.",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:49.295505",
-      "goal_id": "goal_0002_191512",
+      "content": "**Concrete Plan: Designing the Data Contract and Function Signature for LLM-driven Goal Decomposition**\n\n**Goal:** Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behavior when the LLM is unavailable.\n\n**Key Steps:**\n\n1. **Analyze the Existing Architecture:**\n\t* Review the current implementation of GoalStack.decompose() to understand its workflow and requirements.\n\t* Identify the LLM-driven decomposition process and its interaction with the GoalStack framework.\n\t* Update the collective knowledge to reflect the current state of the architecture.\n\t* **Dependencies:** GoalStack.decompose() implementation, collective knowledge (updated to reflect the current state of the architecture)\n\t* Action 1: Review the GoalStack.decompose() implementation and identify key functions, variables, and dependencies.\n\t* Deliverable: Updated collective knowledge with detailed architecture review.\n2. **Determine the LLM-driven Decomposition Requirements:**\n\t* Define the input format for the LLM-driven decomposition process, including the expected structure and content of subgoal descriptions.\n\t* Determine the output schema, including the expected format and structure of the decomposed goals.\n\t* Identify the fallback behavior when the LLM is unavailable, including the alternative decomposition process or the fallback strategy.\n\t* **Dependencies:** Analyzed existing architecture, collective knowledge\n\t* Action 2: Conduct thorough analysis of the LLM-driven decomposition requirements and identify potential complexities.\n\t* Deliverable: Detailed requirements document outlining input format, output schema, and fallback behavior.\n3. **Design the Data Contract:**\n\t* Create a data contract that defines the input format, output schema, and fallback behavior for the LLM-driven decomposition process.\n\t* Ensure the data contract is consistent with the collective knowledge and the existing architecture.\n\t* **Dependencies:** Determined LLM-driven decomposition requirements, analyzed existing architecture\n\t* Action 3: Design a data contract that meets the LLM-driven decomposition requirements and is consistent with the collective knowledge and existing architecture.\n\t* Deliverable: Data contract document outlining input format, output schema, and fallback behavior.\n4. **Implement the Function Signature:**\n\t* Design a function signature that encapsulates the LLM-driven decomposition process, including the input format, output schema, and fallback behavior.\n\t* Ensure the function signature is consistent with the data contract and the collective knowledge.\n\t* **Dependencies:** Designed data contract, analyzed existing architecture\n\t* Action 4:",
+      "importance": 0.6,
+      "timestamp": "2026-03-13T09:46:00.455667",
+      "goal_id": "goal_0003_094254",
       "tags": []
     },
     {
       "id": "evt_000019",
-      "event_type": "belief_formed",
-      "agent": "consensus",
-      "content": "Belief committed [challenged+accepted, confidence=0.95]: Design a health-check mechanism for Legion\nDesign a health-check mechanism for Legion: Implement a self-monitoring capability that includes a health-check mechanism, with a prototype reporting node status and goal queue depth.",
-      "importance": 0.95,
-      "timestamp": "2026-03-12T19:15:55.113788",
-      "goal_id": "goal_0002_191512",
-      "tags": [
-        "belief",
-        "challenged+accepted"
-      ]
+      "event_type": "goal_complete",
+      "agent": "planner",
+      "content": "Goal complete: Design the system prompt and evaluative criteria for an Ethicist node that can serve as a second evaluator in ConsensusEngine alongside Skeptic.\nResult: **Concrete Plan: Designing the Data Contract and Function Signature for LLM-driven Goal Decomposition**\n\n**Goal:** Design the data contract and function signature for LLM-driven goal decomposition in GoalStack.decompose(), including input format, output schema, and fallback behavior when the LLM is unavailable.\n\n**Key Steps:**\n\n1. **Analyze the Existing Architecture:**\n\t* Review the current implementation of GoalStack.decompose() to understand its workflow and requirements.\n\t* Identify the LLM-driven decomposition process and its interaction with the GoalStack framework.\n\t* Update the collective knowledge to reflect the current state of the architecture.\n\t* **Dependencies:** GoalStack.decompose() implementation, collective knowledge (updated to reflect the current state of the architecture)\n\t* Action 1: Review the GoalStack.decompose() implementation and identify key functions, variables, and dependencies.\n\t* Deliverable: Updated collective knowledge with detailed architecture review.\n2. **Determine the LLM-driven Decomposition Requirements:**\n\t* Define the input format for the LLM-driven decomposition process, including the expected structure and content of subgoal descriptions.\n\t* Determine the output schema, including the expected format and structure of the decomposed goals.\n\t* Identify the fallback behavior when the LLM is unavailable, including the alternative decomposition process or the fallback strategy.\n\t* **Dependencies:** Analyzed existing architecture, collective knowledge\n\t* Action 2: Conduct thorough analysis of the LLM-driven decomposition requirements and identify potential complexities.\n\t* Deliverable: Detailed requirements document outlining input format, output schema, and fallback behavior.\n3. **Design the Data Contract:**\n\t* Create a data contract that defines the input format, output schema, and fallback behavior for the LLM-driven decomposition process.\n\t* Ensure the data contract is consistent with the collective knowledge and the existing architecture.\n\t* **Dependencies:** Determined LLM-driven decomposition requirements, analyzed existing architecture\n\t* Action 3: Design a data contract that meets the LLM-driven decomposition requirements and is consistent with the collective knowledge and existing architecture.\n\t* Deliverable: Data contract document outlining input format, output schema, and fallback behavior.\n4. **Implement the Function Signature:**\n\t* Design a function signature that encapsulates the LLM-driven decomposition process, including the input format, output schema, and fallback behavior.\n\t* Ensure the function signature is consistent with the data contract and the collective knowledge.\n\t* **Dependencies:** Designed data contract, analyzed existing architecture\n\t* Action 4:",
+      "importance": 0.6,
+      "timestamp": "2026-03-13T09:46:00.463297",
+      "goal_id": "goal_0003_094254",
+      "tags": []
     },
     {
       "id": "evt_000020",
-      "event_type": "node_output",
-      "agent": "engineer",
-      "content": "[Engineer stub] Received implementation goal: Build a prototype reporting node status and goal queue depth\nPhase 1: Logging intent. Full implementation pending Phase 2 engineer build.\nWould produce: code, tests, and integration artifacts for this subgoal.",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:57.122086",
-      "goal_id": "goal_0003_191512",
-      "tags": [
-        "stub"
-      ]
-    },
-    {
-      "id": "evt_000021",
-      "event_type": "goal_complete",
-      "agent": "engineer",
-      "content": "Goal complete: Build a prototype reporting node status and goal queue depth\nResult: [Engineer stub] Received implementation goal: Build a prototype reporting node status and goal queue depth\nPhase 1: Logging intent. Full implementation pending Phase 2 engineer build.\nWould produce: code, tests, and integration artifacts for this subgoal.",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:57.132159",
-      "goal_id": "goal_0003_191512",
-      "tags": []
-    },
-    {
-      "id": "evt_000022",
-      "event_type": "goal_complete",
-      "agent": "goal_stack",
-      "content": "Parent goal auto-completed: all 3 children finished.\nParent: Design and implement a self-monitoring capability for Legion: analyze current gaps, design a health-check mechanism, and build a prototype that reports node status and goal queue depth.",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:15:57.145930",
-      "goal_id": "goal_0000_191500",
-      "tags": []
-    },
-    {
-      "id": "evt_000023",
-      "event_type": "node_output",
-      "agent": "planner",
-      "content": "Analyze current gaps in self-monitoring capability: Review current implementation of self-monitoring and identify gaps in functionality, including but not limited to, (1) lack of real-time monitoring, (2) limited scope of self-monitoring, and (3) absence of automated alerts for critical issues. \n\nBased on this analysis, identify the top 3 gaps and prioritize them for further development, ensuring alignment with the overall goals of the collective and the primary hardware constraints (e.g., limited local training capabilities, reliance on Anthropic API). \n\nAdditionally, consider the role of the Skeptic and Ethicist evaluative agents in self-monitoring and their potential impact on the overall collective behavior. \n\nAssess the benefits and drawbacks of integrating a health-check mechanism for Legion, including potential improvements to node reliability, scalability, and maintainability. \n\nConclude by recommending a course of action for addressing the identified gaps, including specific design and implementation details where necessary.",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:16:16.567494",
-      "goal_id": "goal_0004_191528",
-      "tags": []
-    },
-    {
-      "id": "evt_000024",
-      "event_type": "goal_complete",
-      "agent": "planner",
-      "content": "Goal complete: Analyze current gaps in self-monitoring capability\nResult: Analyze current gaps in self-monitoring capability: Review current implementation of self-monitoring and identify gaps in functionality, including but not limited to, (1) lack of real-time monitoring, (2) limited scope of self-monitoring, and (3) absence of automated alerts for critical issues. \n\nBased on this analysis, identify the top 3 gaps and prioritize them for further development, ensuring alignment with the overall goals of the collective and the primary hardware constraints (e.g., limited local training capabilities, reliance on Anthropic API). \n\nAdditionally, consider the role of the Skeptic and Ethicist evaluative agents in self-monitoring and their potential impact on the overall collective behavior. \n\nAssess the benefits and drawbacks of integrating a health-check mechanism for Legion, including potential improvements to node reliability, scalability, and maintainability. \n\nConclude by recommending a course of action for addressing the identified gaps, including specific design and implementation details where necessary.",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:16:16.574628",
-      "goal_id": "goal_0004_191528",
-      "tags": []
-    },
-    {
-      "id": "evt_000025",
       "event_type": "belief_formed",
       "agent": "consensus",
-      "content": "Belief committed [challenged+accepted, confidence=0.99]: Build a prototype reporting node status and goal queue depth\n[Engineer stub] Received implementation goal: Build a prototype reporting node status and goal queue depth\nPhase 1: Logging intent. Full implementation pending Phase 2 engineer build.\nWould produce: c...",
-      "importance": 0.99,
-      "timestamp": "2026-03-12T19:16:23.989227",
-      "goal_id": "goal_0003_191512",
-      "tags": [
-        "belief",
-        "challenged+accepted"
-      ]
-    },
-    {
-      "id": "evt_000026",
-      "event_type": "belief_formed",
-      "agent": "consensus",
-      "content": "Belief committed [challenged+accepted, confidence=0.99]: Analyze current gaps in self-monitoring capability\nAnalyze current gaps in self-monitoring capability: Review current implementation of self-monitoring and identify gaps in functionality, including but not limited to, (1) lack of real-time monitoring,...",
-      "importance": 0.99,
-      "timestamp": "2026-03-12T19:16:35.062176",
-      "goal_id": "goal_0004_191528",
-      "tags": [
-        "belief",
-        "challenged+accepted"
-      ]
-    },
-    {
-      "id": "evt_000027",
-      "event_type": "node_output",
-      "agent": "planner",
-      "content": "{'gaps': ['lack of real-time monitoring', 'limited scope of self-monitoring', 'absence of automated alerts for critical issues'], 'prioritized_gaps': ['lack of real-time monitoring', 'absence of automated alerts for critical issues', 'limited scope of self-monitoring'], 'recommended_action': 'Design a health-check mechanism with real-time monitoring, automated alerts for critical issues, and incremental scope expansion, ensuring alignment with the primary hardware constraints and overall collective goals.', 'integration_benefits': ['improved node reliability', 'enhanced scalability', 'better maintainability']}",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:16:59.513700",
-      "goal_id": "goal_0005_191528",
-      "tags": []
-    },
-    {
-      "id": "evt_000028",
-      "event_type": "goal_complete",
-      "agent": "planner",
-      "content": "Goal complete: Design a health-check mechanism for Legion\nResult: {'gaps': ['lack of real-time monitoring', 'limited scope of self-monitoring', 'absence of automated alerts for critical issues'], 'prioritized_gaps': ['lack of real-time monitoring', 'absence of automated alerts for critical issues', 'limited scope of self-monitoring'], 'recommended_action': 'Design a health-check mechanism with real-time monitoring, automated alerts for critical issues, and incremental scope expansion, ensuring alignment with the primary hardware constraints and overall collective goals.', 'integration_benefits': ['improved node reliability', 'enhanced scalability', 'better maintainability']}",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:16:59.521154",
-      "goal_id": "goal_0005_191528",
-      "tags": []
-    },
-    {
-      "id": "evt_000029",
-      "event_type": "belief_formed",
-      "agent": "consensus",
-      "content": "Belief committed [challenged+accepted, confidence=0.99]: Design a health-check mechanism for Legion\n{'gaps': ['lack of real-time monitoring', 'limited scope of self-monitoring', 'absence of automated alerts for critical issues'], 'prioritized_gaps': ['lack of real-time monitoring', 'absence of autom...",
-      "importance": 0.99,
-      "timestamp": "2026-03-12T19:17:09.404791",
-      "goal_id": "goal_0005_191528",
-      "tags": [
-        "belief",
-        "challenged+accepted"
-      ]
-    },
-    {
-      "id": "evt_000030",
-      "event_type": "node_output",
-      "agent": "engineer",
-      "content": "[Engineer stub] Received implementation goal: Build a prototype reporting node status and goal queue depth\nPhase 1: Logging intent. Full implementation pending Phase 2 engineer build.\nWould produce: code, tests, and integration artifacts for this subgoal.",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:17:11.417822",
-      "goal_id": "goal_0006_191528",
-      "tags": [
-        "stub"
-      ]
-    },
-    {
-      "id": "evt_000031",
-      "event_type": "goal_complete",
-      "agent": "engineer",
-      "content": "Goal complete: Build a prototype reporting node status and goal queue depth\nResult: [Engineer stub] Received implementation goal: Build a prototype reporting node status and goal queue depth\nPhase 1: Logging intent. Full implementation pending Phase 2 engineer build.\nWould produce: code, tests, and integration artifacts for this subgoal.",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:17:11.423585",
-      "goal_id": "goal_0006_191528",
-      "tags": []
-    },
-    {
-      "id": "evt_000032",
-      "event_type": "goal_complete",
-      "agent": "goal_stack",
-      "content": "Parent goal auto-completed: all 3 children finished.\nParent: Analyze current gaps in self-monitoring capability",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:17:11.428536",
-      "goal_id": "goal_0001_191512",
-      "tags": []
-    },
-    {
-      "id": "evt_000033",
-      "event_type": "goal_complete",
-      "agent": "goal_stack",
-      "content": "Parent goal auto-completed: all 3 children finished.\nParent: Design and implement a self-monitoring capability for Legion: analyze current gaps, design a health-check mechanism, and build a prototype that reports node status and goal queue depth.",
-      "importance": 0.7,
-      "timestamp": "2026-03-12T19:17:11.433704",
-      "goal_id": "goal_0000_191500",
-      "tags": []
-    },
-    {
-      "id": "evt_000034",
-      "event_type": "belief_formed",
-      "agent": "consensus",
-      "content": "Belief committed [challenged+accepted, confidence=0.99]: Build a prototype reporting node status and goal queue depth\n[Engineer stub] Received implementation goal: Build a prototype reporting node status and goal queue depth\nPhase 1: Logging intent. Full implementation pending Phase 2 engineer build.\nWould produce: c...",
-      "importance": 0.99,
-      "timestamp": "2026-03-12T19:17:19.108418",
-      "goal_id": "goal_0006_191528",
+      "content": "Belief committed [challenged+accepted, confidence=0.95]: Design the system prompt and evaluative criteria for an Ethicist node that can serve as a second evaluator in ConsensusEngine alongside Skeptic.\n**Concrete Plan: Designing the Data Contract and Function Signature for LLM-driven Goal Decomposition**\n\n**Goal:** Design the data contract and function signature for LLM-driven goal decomposition in ...",
+      "importance": 0.95,
+      "timestamp": "2026-03-13T09:46:17.283919",
+      "goal_id": "goal_0003_094254",
       "tags": [
         "belief",
         "challenged+accepted"
@@ -953,9 +723,9 @@
     }
   ],
   "meta": {
-    "last_saved": "2026-03-12T19:17:19.125201",
-    "event_count": 34,
-    "belief_count": 34,
-    "goal_count": 7
+    "last_saved": "2026-03-13T09:46:17.287526",
+    "event_count": 20,
+    "belief_count": 32,
+    "goal_count": 4
   }
 }

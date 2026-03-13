@@ -70,6 +70,7 @@ class Goal:
     parent_id:   Optional[str] = None
     depends_on:  list = field(default_factory=list)
     assigned_to: Optional[str] = None
+    closes_gap:  Optional[str] = None  # belief_id of gap this goal closes, set by strategist
 
 
 @dataclass
@@ -140,10 +141,38 @@ class SharedWorldModel:
             with open(self.path) as f:
                 data = json.load(f)
 
-            self.beliefs = {k: Belief(**v) for k, v in data.get("beliefs", {}).items()}
-            self.goals   = {k: Goal(**v)   for k, v in data.get("goals", {}).items()}
-            self.nodes   = {k: NodeRecord(**v) for k, v in data.get("nodes", {}).items()}
-            self.events  = [Event(**e) for e in data.get("events", [])]
+            # setdefault guards: fields added after initial serialization won't
+            # exist in older JSON records. Each line ensures the key is present
+            # before **v unpacking so dataclass construction never receives an
+            # unexpected-keyword or missing-argument error.
+
+            beliefs_raw = data.get("beliefs", {})
+            for v in beliefs_raw.values():
+                v.setdefault("tags", [])
+                v.setdefault("evidence", [])
+            self.beliefs = {k: Belief(**v) for k, v in beliefs_raw.items()}
+
+            goals_raw = data.get("goals", {})
+            for v in goals_raw.values():
+                v.setdefault("parent_id", None)
+                v.setdefault("depends_on", [])
+                v.setdefault("assigned_to", None)
+                v.setdefault("closes_gap", None)
+            self.goals = {k: Goal(**v) for k, v in goals_raw.items()}
+
+            nodes_raw = data.get("nodes", {})
+            for v in nodes_raw.values():
+                v.setdefault("tasks_completed", 0)
+                v.setdefault("status", "idle")
+                v.setdefault("current_goal_id", None)
+            self.nodes = {k: NodeRecord(**v) for k, v in nodes_raw.items()}
+
+            events_raw = data.get("events", [])
+            for e in events_raw:
+                e.setdefault("goal_id", None)
+                e.setdefault("tags", [])
+            self.events = [Event(**e) for e in events_raw]
+
             self._event_counter = len(self.events)
 
     async def _save_unlocked(self) -> None:
@@ -245,10 +274,15 @@ class SharedWorldModel:
         source:      str   = "human",
         parent_id:   Optional[str] = None,
         depends_on:  list  = None,
+        closes_gap:  Optional[str] = None,
     ) -> Goal:
         """
         Add a goal. Called by human OR by Planner node (self-direction).
         Self-generated goals are the key property that makes Legion alive.
+
+        closes_gap: belief_id of a gap belief this goal is intended to close.
+                    Set by the strategist. Consensus reads it on commit and
+                    marks the gap belief as resolved.
         """
         goal_id = f"goal_{len(self.goals):04d}_{datetime.now().strftime('%H%M%S')}"
         now = datetime.now().isoformat()
@@ -256,6 +290,7 @@ class SharedWorldModel:
             id=goal_id, description=description, priority=priority,
             status="pending", source=source, created_at=now, updated_at=now,
             parent_id=parent_id, depends_on=depends_on or [],
+            closes_gap=closes_gap,
         )
         async with self._lock:
             self.goals[goal_id] = goal
@@ -357,6 +392,31 @@ class SharedWorldModel:
     def get_active_beliefs(self, min_confidence: float = 0.5) -> list[Belief]:
         """The collective's current committed worldview."""
         return [b for b in self.beliefs.values() if b.confidence >= min_confidence]
+
+    def get_open_gaps(self) -> list[Belief]:
+        """
+        Return gap beliefs that have not yet been resolved.
+        Used by the strategist to generate closure goals.
+        A gap is open if its id starts with 'gap_' and 'resolved' is not in its tags.
+        """
+        return [
+            b for b in self.beliefs.values()
+            if b.id.startswith("gap_") and "resolved" not in b.tags
+        ]
+
+    async def resolve_gap(self, gap_belief_id: str) -> None:
+        """
+        Mark a gap belief as resolved by appending 'resolved' to its tags.
+        Called by ConsensusEngine when a goal with closes_gap set is committed.
+        No-op if the belief doesn't exist or is already resolved.
+        """
+        async with self._lock:
+            belief = self.beliefs.get(gap_belief_id)
+            if belief is None or "resolved" in belief.tags:
+                return
+            belief.tags.append("resolved")
+            belief.updated_at = datetime.now().isoformat()
+            await self._save_unlocked()
 
     def get_pending_goals(self) -> list[Goal]:
         """Goals ready to work on, sorted by priority. Used by GoalStack."""

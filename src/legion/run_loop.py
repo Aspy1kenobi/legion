@@ -27,6 +27,18 @@ Startup sequence:
     3. Optionally seed initial goals (human or from prior session)
     4. Enter tick loop
 
+Tick sequence (order matters — do not reorder without reading comments):
+    1. dispatch_all()               — claim + execute pending goals
+    2. _run_consensus_on_completions() — challenge/accept completed goals
+    3. _run_strategist()            — push gap goals if queue is empty
+    4. _should_halt()               — NOW safe to check: strategist has had
+                                      its chance to refill the queue
+
+The strategist MUST fire before _should_halt() or it never runs in short
+sessions. When the initial goal completes and is committed, the queue hits
+zero. If halt fires first, the strategist never pushes gap goals and auto-halt
+triggers on an empty queue that the strategist would have refilled.
+
 Usage:
     # Minimal — seed one goal and run
     asyncio.run(main(
@@ -62,159 +74,107 @@ from bootstrap_beliefs import bootstrap_beliefs
 TICK_INTERVAL_ACTIVE = 2.0   # seconds — work is in progress, check frequently
 TICK_INTERVAL_IDLE   = 10.0  # seconds — queue empty, no point hammering wm
 
-# ── Node definitions ──────────────────────────────────────────────────────────
-# These are the Legion-native replacements for the agent functions in agents.py.
-# Each fn signature: async (goal: Goal, wm: SharedWorldModel) -> str
-#
-# Phase 1 implementations are intentionally minimal — they call the LLM with
-# goal context and return the response. Richer behavior (self-retrieval,
-# multi-step reasoning) layers on top of this foundation.
-
-MAX_DECOMPOSE_DEPTH = 2  # tunable — raise to allow deeper trees
-
-
-def _goal_depth(goal, wm: SharedWorldModel) -> int:
-    """
-    Count hops from goal to root via parent_id chain.
-    Root goal (no parent) = depth 0. Direct child = depth 1. Etc.
-    Caps at MAX_DECOMPOSE_DEPTH + 1 to avoid unbounded traversal on corrupt data.
-    """
-    depth = 0
-    current = goal
-    while current.parent_id and depth <= MAX_DECOMPOSE_DEPTH:
-        parent = wm.goals.get(current.parent_id)
-        if parent is None:
-            break
-        current = parent
-        depth += 1
-    return depth
-
+# ── Node functions ────────────────────────────────────────────────────────────
 
 async def _planner_fn(goal, wm: SharedWorldModel) -> str:
     """
-    Procedural node: decomposes goals into plans OR subgoal trees autonomously.
-
-    Decision logic (single LLM call):
-      - If goal is complex/multi-step AND depth < MAX_DECOMPOSE_DEPTH:
-            → return JSON {"decompose": true, "subgoals": [...]}
-      - Otherwise (atomic, directly answerable, or at depth limit):
-            → return JSON {"decompose": false, "result": "..."}
-
-    Depth limit (MAX_DECOMPOSE_DEPTH=2) prevents unbounded recursion.
-    Goals at or beyond the limit are forced to atomic execution regardless
-    of LLM preference. Limit is a module constant — raise it to allow
-    deeper trees when legitimate multi-level decomposition is needed.
-
-    Attribution scaffolding (JARVIS paper finding): collective beliefs and
-    context are injected explicitly so the procedural node doesn't collapse.
+    Procedural node: decomposes goals into plans.
+    Reads collective context, produces a structured plan.
+    Attribution scaffolding required (JARVIS paper finding) — context
+    injection via wm.format_context_for_prompt() provides this.
     """
-    import json
     from llm_client import call_llm
     from config import Config
-    from goal_stack import GoalStack
 
     config     = Config()
-    gs         = GoalStack(wm)
-    depth      = _goal_depth(goal, wm)
-    at_limit   = depth >= MAX_DECOMPOSE_DEPTH
     context    = wm.format_context_for_prompt(goal.description, top_k=4)
     beliefs    = wm.get_active_beliefs(min_confidence=0.5)
     belief_str = "\n".join(f"- {b.content}" for b in beliefs) or "(none yet)"
 
-    if at_limit:
-        # Force atomic — tell the LLM it must execute, not decompose
-        system_content = (
-            "You are a strategic planner in a multi-agent AI collective. "
-            "Your output will be reviewed by an evaluative agent before being "
-            "committed as a collective belief. Be specific and actionable.\n\n"
-            "You must respond with a single JSON object and nothing else.\n\n"
-            "This goal is a leaf node — execute it directly. Do NOT decompose.\n"
-            'Respond with: {"decompose": false, "result": "<your full answer>"}'
-        )
-    else:
-        system_content = (
-            "You are a strategic planner in a multi-agent AI collective. "
-            "Your output will be reviewed by an evaluative agent before being "
-            "committed as a collective belief. Be specific and actionable.\n\n"
-            "You must respond with a single JSON object and nothing else — "
-            "no preamble, no explanation outside the JSON.\n\n"
-            "If the goal is complex or multi-step (requires multiple distinct "
-            "phases of work), respond with:\n"
-            '{"decompose": true, "subgoals": ["<step 1>", "<step 2>", ...]}\n\n'
-            "Subgoals must be concrete and specific. Each must be completable "
-            "by a single agent. Use 2–5 subgoals maximum. Subgoal descriptions "
-            "must contain capability keywords: 'analyze', 'design', 'plan', "
-            "'implement', 'build', 'code', 'test', or 'evaluate'.\n\n"
-            "If the goal is atomic or directly answerable, respond with:\n"
-            '{"decompose": false, "result": "<your full answer>"}'
-        )
-
     messages = [
-        {"role": "system", "content": system_content},
+        {
+            "role": "system",
+            "content": (
+                "You are a strategic planner in a multi-agent AI collective. "
+                "Your output will be reviewed by an evaluative agent before being "
+                "committed as a collective belief. Be specific and actionable. "
+                "Connect your plan to what the collective already knows."
+            ),
+        },
         {
             "role": "user",
             "content": (
                 f"GOAL: {goal.description}\n\n"
                 f"COLLECTIVE BELIEFS (committed truths):\n{belief_str}\n\n"
                 f"RECENT COLLECTIVE ACTIVITY:\n{context or '(none)'}\n\n"
-                + (
-                    "Execute this goal directly. Respond with JSON only."
-                    if at_limit else
-                    "Decide: is this goal atomic (answer it directly) or complex "
-                    "(decompose into subgoals)? Respond with JSON only."
-                )
+                "Produce a concrete plan to accomplish this goal. "
+                "Identify the key steps, dependencies, and the single most "
+                "important action to take first."
             ),
         },
     ]
 
-    raw, _ = await call_llm(messages, config)
-
-    # ── Parse LLM response ────────────────────────────────────────────────────
-    try:
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            lines = cleaned.split("\n")
-            cleaned = "\n".join(l for l in lines if not l.startswith("```")).strip()
-        data = json.loads(cleaned)
-    except Exception as e:
-        # Parse failure → treat as atomic, use raw text as result
-        await wm.add_event(
-            agent="planner",
-            event_type="node_output",
-            content=f"[parse_failed: {e}] {raw}",
-            importance=goal.priority,
-            goal_id=goal.id,
-            tags=["parse_error"],
-        )
-        return raw
-
-    # ── Decompose path ────────────────────────────────────────────────────────
-    if data.get("decompose") and data.get("subgoals") and not at_limit:
-        subgoals = [str(s) for s in data["subgoals"] if str(s).strip()]
-        if not subgoals:
-            # Malformed — fall through to atomic
-            data["decompose"] = False
-            data["result"] = raw
-        else:
-            children = await gs.decompose(goal.id, subgoals, source="planner")
-            summary = (
-                f"Decomposed into {len(children)} subgoals:\n" +
-                "\n".join(f"  {i+1}. {c.description}" for i, c in enumerate(children))
-            )
-            await wm.add_event(
-                agent="planner",
-                event_type="node_output",
-                content=summary,
-                importance=goal.priority,
-                goal_id=goal.id,
-                tags=["decomposed"],
-            )
-            return summary
-
-    # ── Atomic path ───────────────────────────────────────────────────────────
-    result = str(data.get("result", raw))
+    result, _ = await call_llm(messages, config)
     await wm.add_event(
         agent="planner",
+        event_type="node_output",
+        content=result,
+        importance=goal.priority,
+        goal_id=goal.id,
+    )
+    return result
+
+
+async def _engineer_fn(goal, wm: SharedWorldModel) -> str:
+    """
+    Procedural node: produces concrete implementations, code, and prototypes.
+    Claims goals containing implement/build/code/write/develop/prototype/create.
+    Where the planner produces plans, the engineer produces artifacts.
+    """
+    from llm_client import call_llm
+    from config import Config
+
+    config     = Config()
+    context    = wm.format_context_for_prompt(goal.description, top_k=4)
+    beliefs    = wm.get_active_beliefs(min_confidence=0.5)
+    belief_str = "\n".join(f"- {b.content}" for b in beliefs) or "(none yet)"
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a pragmatic engineer in a multi-agent AI collective. "
+                "Your output will be reviewed by an evaluative agent before being "
+                "committed as a collective belief. Produce concrete, specific "
+                "artifacts: code, pseudocode, data structures, or step-by-step "
+                "implementation instructions. Do not produce abstract plans — "
+                "produce things that can be directly built or evaluated.\n\n"
+                "CODEBASE CONTEXT (read before producing any code):\n"
+                "- Language: Python 3.11, asyncio, no new dependencies without explicit justification\n"
+                "- LLM calls: use call_llm(messages, config) from llm_client.py — do NOT import torch, "
+                "transformers, or any ML library\n"
+                "- Node functions signature: async def fn(goal, wm: SharedWorldModel) -> str\n"
+                "- All persistence goes through wm.add_event() — do not write files directly\n"
+                "- Existing patterns are in run_loop.py: _planner_fn is the canonical example to follow"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"GOAL: {goal.description}\n\n"
+                f"COLLECTIVE BELIEFS (committed truths):\n{belief_str}\n\n"
+                f"RECENT COLLECTIVE ACTIVITY:\n{context or '(none)'}\n\n"
+                "Produce a concrete implementation or artifact to accomplish this goal. "
+                "Follow the codebase context above exactly. "
+                "If the goal involves Python code, write code that fits directly into the "
+                "existing codebase without new dependencies."
+            ),
+        },
+    ]
+
+    result, _ = await call_llm(messages, config)
+    await wm.add_event(
+        agent="engineer",
         event_type="node_output",
         content=result,
         importance=goal.priority,
@@ -232,7 +192,7 @@ async def _skeptic_fn(goal, wm: SharedWorldModel) -> str:
     from llm_client import call_llm
     from config import Config
 
-    config  = Config()
+    config = Config()
     # Self-retrieval: skeptic reads its own prior outputs — the mechanism
     # behind emergent self-correction per the JARVIS paper
     self_context  = wm.format_context_for_prompt(
@@ -274,58 +234,132 @@ async def _skeptic_fn(goal, wm: SharedWorldModel) -> str:
     return result
 
 
-async def _engineer_fn(goal, wm: SharedWorldModel) -> str:
-    """
-    Procedural node: handles implementation, coding, and testing subgoals.
-
-    Phase 1 stub: logs intent and returns a structured acknowledgment.
-    Exists to absorb implementation subgoals generated by planner decomposition
-    so they don't pile up unhandled. Real implementation in Phase 2.
-    """
-    result = (
-        f"[Engineer stub] Received implementation goal: {goal.description}\n"
-        f"Phase 1: Logging intent. Full implementation pending Phase 2 engineer build.\n"
-        f"Would produce: code, tests, and integration artifacts for this subgoal."
-    )
-    await wm.add_event(
-        agent="engineer",
-        event_type="node_output",
-        content=result,
-        importance=goal.priority,
-        goal_id=goal.id,
-        tags=["stub"],
-    )
-    return result
-
-
 def _build_default_nodes() -> list[LegionNode]:
     """
     Construct the default Legion node pool.
-    Extend this list as new node types are added.
+
+    Capability vocabulary is partitioned deliberately:
+        planner   — strategic/structural verbs: plan, decompose, analyze, design, define, structure
+        engineer  — execution verbs: implement, build, code, test, integrate, write, develop,
+                    prototype, create
+        skeptic   — evaluative verbs: review, evaluate, assess, check, verify, challenge, audit
+
+    Overlap between planner and engineer was the routing bug from the previous session.
+    Keep these lists disjoint. If a new verb could belong to either, assign it to engineer
+    (engineer is the executor; planner is the strategist).
     """
     return [
         LegionNode(
             name="planner",
             role_type="procedural",
-            capabilities=["plan", "decompose", "analyze", "design", "build",
-                          "implement", "create", "define", "structure"],
+            capabilities=["plan", "decompose", "analyze", "design", "define", "structure"],
             fn=_planner_fn,
         ),
         LegionNode(
             name="engineer",
             role_type="procedural",
             capabilities=["implement", "build", "code", "test", "integrate",
-                          "write", "develop", "prototype"],
+                          "write", "develop", "prototype", "create"],
             fn=_engineer_fn,
         ),
         LegionNode(
             name="skeptic",
             role_type="evaluative",
-            capabilities=["review", "evaluate", "assess", "check", "test",
+            capabilities=["review", "evaluate", "assess", "check",
                           "verify", "challenge", "audit"],
             fn=_skeptic_fn,
         ),
     ]
+
+
+# ── Strategist ────────────────────────────────────────────────────────────────
+
+async def _run_strategist(wm: SharedWorldModel, gs: GoalStack) -> int:
+    """
+    Survey committed beliefs for known gaps and push actionable follow-up goals.
+
+    Called every tick, BEFORE _should_halt(), so it can refill the queue
+    before the halt condition is evaluated. This is the fix for the ordering
+    bug where auto-halt fired before the strategist had a chance to run.
+
+    Returns the number of new goals pushed this tick (0 if queue was not empty
+    or no actionable gaps were found).
+
+    Design rules:
+      - Only fires when the goal queue is fully empty (pending == 0 AND active == 0).
+        If there is still work to do, the strategist stays silent.
+      - Each gap belief maps to exactly one concrete, narrow goal. The goal must
+        be specific enough for the skeptic to evaluate it against factual criteria,
+        not just opinion. "Implement X" beats "Think about X."
+      - Goals are not duplicated: before pushing, check whether a goal with
+        matching description already exists (any status). This prevents the
+        strategist from re-pushing goals that were already attempted and failed.
+      - Pushed at priority 0.6 (below human-seeded 0.7 — human intent leads).
+    """
+    s = wm.status()
+    if s["goals_pending"] > 0 or s["goals_active"] > 0:
+        return 0  # Queue has work — strategist is silent
+
+    # Build a set of existing goal descriptions (normalised) for dedup
+    existing_descriptions = {
+        g.description.strip().lower()
+        for g in wm.goals.values()
+    }
+
+    # ── Gap → goal mapping ────────────────────────────────────────────────────
+    # Each entry: (belief_id_that_signals_gap, goal_description_to_push)
+    # Descriptions must:
+    #   - contain a keyword from engineer's or planner's capability list
+    #   - be narrow enough for the skeptic to return accept/reject on factual grounds
+    #   - produce a concrete artifact (code, spec, data structure) not an opinion
+    #
+    # gap_llm_decomposition is intentionally absent here — it is the seed goal
+    # at the entry point. Including it would cause the strategist to push a
+    # duplicate on the same tick the seed goal commits.
+    GAP_GOALS: list[tuple[str, str]] = [
+        (
+            "gap_can_handle_keyword",
+            "Implement a cosine-similarity alternative to keyword matching in "
+            "LegionNode.can_handle() using sentence embeddings, with a fallback "
+            "to the existing keyword path when embeddings are unavailable.",
+        ),
+        (
+            "gap_engineer_node_missing",
+            # Goal description kept narrow: produce only the async function body
+            # and the LegionNode registration line — no ML model classes, no
+            # new dependencies. The implementation target is run_loop.py in a
+            # Python 3.11 asyncio codebase that calls call_llm() from llm_client.py.
+            "Write the async _engineer_fn(goal, wm) function body for run_loop.py "
+            "that calls call_llm() with an engineer system prompt and returns the "
+            "result string, following the same pattern as _planner_fn. "
+            "Also write the LegionNode(...) registration line for _build_default_nodes().",
+        ),
+        (
+            "gap_ethicist_node_missing",
+            "Design the system prompt and evaluative criteria for an Ethicist node "
+            "that can serve as a second evaluator in ConsensusEngine alongside Skeptic.",
+        ),
+    ]
+
+    pushed = 0
+    for belief_id, goal_description in GAP_GOALS:
+        # Only act on beliefs that are actually committed (confidence >= 0.5)
+        belief = wm.beliefs.get(belief_id)
+        if belief is None or belief.confidence < 0.5:
+            continue
+
+        # Skip if a goal with this description was already pushed (any status)
+        if goal_description.strip().lower() in existing_descriptions:
+            continue
+
+        await gs.push(
+            description=goal_description,
+            priority=0.6,
+            source="strategist",
+        )
+        pushed += 1
+
+    return pushed
 
 
 # ── RunLoop ───────────────────────────────────────────────────────────────────
@@ -379,8 +413,7 @@ class RunLoop:
         self.wm = SharedWorldModel(self.wm_path)
         await self.wm.load()
         belief_count = await bootstrap_beliefs(self.wm)
-        self._log(f"Bootstrap complete", f"{belief_count} beliefs seeded")
-
+        self._log("Bootstrap complete", f"{belief_count} beliefs seeded")
 
         # 2. Goal stack
         self.gs = GoalStack(self.wm)
@@ -394,7 +427,7 @@ class RunLoop:
 
         # 4. Consensus engine — evaluative nodes only
         evaluative = [n for n in self.node_list if n.role_type == "evaluative"]
-        self.consensus = ConsensusEngine(self.wm, config, evaluative, max_retries=3)
+        self.consensus = ConsensusEngine(self.wm, config, evaluative)
 
         # 5. Seed initial goals
         for description in self.initial_goals:
@@ -408,33 +441,42 @@ class RunLoop:
 
     async def tick(self) -> float:
         """
-        One tick: dispatch eligible goals, run consensus on completions.
-        Returns the sleep interval to use before the next tick.
+        One tick: dispatch → consensus → strategist → halt-check.
+
+        Tick order is load-bearing:
+          1. dispatch_all()                  — do the work
+          2. _run_consensus_on_completions() — commit results
+          3. _run_strategist()               — refill queue from gaps
+          4. _should_halt() (in run())       — halt only after strategist fires
+
+        The strategist must run before the halt check. If halt fires on an
+        empty queue before the strategist has a chance to push gap goals,
+        Legion shuts down after the first goal completes instead of pursuing
+        its known architectural gaps autonomously.
         """
         self._tick_count += 1
         self._log(f"── Tick {self._tick_count} ──────────────────────")
 
-        # Dispatch all eligible goals concurrently
+        # 1. Dispatch all eligible goals concurrently
         dispatch_result = await self.dispatcher.dispatch_all()
         self._log("Dispatch", dispatch_result)
 
-        # Run consensus on any goals that completed this tick
-        # (goals whose status just became "complete" but have no belief yet)
+        # 2. Consensus: challenge/accept any newly completed goals
         await self._run_consensus_on_completions()
 
-        # Abandon goals whose dependencies were abandoned (prevents infinite pending)
-        await self._abandon_orphaned_goals()
+        # 3. Strategist: push gap goals if queue is now empty
+        #    Must happen BEFORE _should_halt() is evaluated in run()
+        new_goals = await _run_strategist(self.wm, self.gs)
+        if new_goals:
+            self._log("Strategist", f"pushed {new_goals} gap goal(s)")
 
-        # Status snapshot
+        # 4. Status snapshot (read AFTER strategist so counts are accurate)
         wm_status = self.wm.status()
         self._log("World model", wm_status)
 
-        # Adaptive sleep: idle if nothing is happening
-        has_active = wm_status["goals_active"] > 0
-        has_pending = wm_status["goals_pending"] > 0
-        if has_active or has_pending:
-            return TICK_INTERVAL_ACTIVE
-        return TICK_INTERVAL_IDLE
+        # Adaptive sleep
+        has_work = wm_status["goals_active"] > 0 or wm_status["goals_pending"] > 0
+        return TICK_INTERVAL_ACTIVE if has_work else TICK_INTERVAL_IDLE
 
     async def _run_consensus_on_completions(self) -> None:
         """
@@ -461,39 +503,12 @@ class RunLoop:
             if not relevant_events:
                 continue
 
-            result    = relevant_events[0].content
-            producer  = relevant_events[0].agent
+            result   = relevant_events[0].content
+            producer = relevant_events[0].agent
 
             self._log(f"Consensus: evaluating {goal.id}")
             committed = await self.consensus.evaluate(goal, result, producer)
             self._log(f"Consensus: {'committed' if committed else 'rejected'}", goal.id)
-
-    async def _abandon_orphaned_goals(self) -> None:
-        """
-        Abandon any pending goal whose dependency was abandoned.
-        Prevents orphaned goals from holding the queue open indefinitely.
-        Recursive via repeated tick calls — each pass clears one level of depth.
-        """
-        for goal in list(self.wm.goals.values()):
-            if goal.status != "pending":
-                continue
-            for dep_id in goal.depends_on:
-                dep = self.wm.goals.get(dep_id)
-                if dep and dep.status == "abandoned":
-                    await self.wm.update_goal_status(goal.id, status="abandoned")
-                    await self.wm.add_event(
-                        agent="run_loop",
-                        event_type="goal_escalated",
-                        content=(
-                            f"Goal abandoned: dependency {dep_id} was abandoned.\n"
-                            f"Blocked goal: {goal.description}"
-                        ),
-                        importance=0.9,
-                        goal_id=goal.id,
-                        tags=["orphaned", "escalation"],
-                    )
-                    self._log(f"Orphan abandoned: {goal.id}", goal.description[:60])
-                    break  # one abandoned dep is enough; move to next goal
 
     # ── Halt detection ────────────────────────────────────────────────────────
 
@@ -501,6 +516,9 @@ class RunLoop:
         """
         Check whether the loop should stop.
         Returns (should_halt, reason).
+
+        Called AFTER tick() (which calls the strategist), so the strategist
+        has already had its chance to push new goals before this evaluates.
         """
         if self.max_ticks and self._tick_count >= self.max_ticks:
             return True, f"max_ticks={self.max_ticks} reached"
@@ -508,7 +526,7 @@ class RunLoop:
         if self.auto_halt:
             s = self.wm.status()
             if s["goals_pending"] == 0 and s["goals_active"] == 0:
-                return True, "goal queue exhausted"
+                return True, "goal queue exhausted (strategist found no new gaps)"
 
         return False, ""
 
@@ -527,6 +545,7 @@ class RunLoop:
             while self._running:
                 sleep_interval = await self.tick()
 
+                # _should_halt() is safe here: tick() ran the strategist first
                 halt, reason = self._should_halt()
                 if halt:
                     self._log(f"Halting: {reason}")
@@ -580,12 +599,21 @@ async def main(
 
 
 if __name__ == "__main__":
-    # Default run: seed one goal and let Legion work autonomously
+    # Seed goal is intentionally narrow and factual so the skeptic can commit it.
+    #
+    # REJECTED (too broad/speculative — produces opinion, not committable fact):
+    #   "Analyze the Legion architecture and identify the most critical missing capability"
+    #
+    # ACCEPTED (narrow, concrete, produces an artifact the skeptic can evaluate):
+    #   "Design the function signature for LLM-driven goal decomposition"
+    #
+    # The strategist will push the remaining gap goals automatically once the
+    # first goal commits and the queue empties. No need to seed them all here.
     asyncio.run(main(
         initial_goals=[
-            "Design and implement a self-monitoring capability for Legion: "
-            "analyze current gaps, design a health-check mechanism, and "
-            "build a prototype that reports node status and goal queue depth."
+            "Design the data contract and function signature for LLM-driven "
+            "goal decomposition in GoalStack.decompose(), including input format, "
+            "output schema, and fallback behaviour when the LLM is unavailable.",
         ],
-        max_ticks=20,
+        max_ticks=10,
     ))

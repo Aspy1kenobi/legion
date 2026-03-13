@@ -137,33 +137,32 @@ entirely with the new block before handing off to the researcher._
 **Queries Answered This Session:**
 _(Brief log of what was asked and what you answered — enough for the next session
 to know what ground has been covered)_
-- None yet
-
-**Findings Confirmed:**
 Queries Answered This Session:
 
-Confirmed prompts.py structure and build_messages() interface for Legion node prompts
-Reviewed goal_stack.py dual-state and sync/async boundary problems
-Reviewed dispatcher.py design including LegionNode.can_handle() and dispatch_all() concurrency
-Confirmed world_model.py nested lock deadlock in add_belief()/save() and _save_unlocked() fix
-Drafted 22-belief bootstrap set from kickoff doc content
-Confirmed Config.from_env() routing logic via llm_client.py review
-Advised on .env vs .env.template separation and key regeneration
-Reviewed first and second run outputs and diagnosed root causes
+Confirmed clean end-to-end pipeline run (single goal → dispatch → consensus → commit → halt)
+Advised on decomposition vs engineer node priority — decomposition selected
+Confirmed decomposition working with recursive firing and depth limit behavior
+Diagnosed unbounded goal tree growth — depth limit fix selected over atomic marker or goal type field
+Confirmed depth-limited run producing target behavior (7 goals, 7 complete, clean halt)
+Advised on proactive vs reactive boundary — gap-driven strategist as middle ground
+Diagnosed bootstrap overwrite problem — skip-if-exists fix applied
+Advised on gap belief lifecycle — tag-based resolved convention selected
+Reviewed Belief dataclass question re: metadata placement
+Confirmed closes_gap field on Goal, resolve_gap() on wm, consensus _commit() integration
+Advised on backward compatibility patch for closes_gap and tags fields on load
+Reviewed strategist design — goals_pending == 0 AND goals_active == 0 threshold confirmed, sequencing before halt check confirmed
+Produced complete updated run_loop.py with all three changes applied
 
 Findings Confirmed:
 
-Bootstrap beliefs must be atomic and single-claim for keyword retrieval to score precisely
-Nested asyncio lock acquisition in add_belief()/add_goal()/add_event()/update_goal_status() causes silent deadlock; _save_unlocked() pattern resolves it
-On first run planner was grounded via in-memory beliefs despite disk persistence failing
-Bootstrap working confirmed by qualitative shift in rejection reason between run 1 and run 2
-gap_can_handle_keyword belief is now live — child goal descriptions must contain capability keywords
+Strategist must check both goals_pending and goals_active — queue can be momentarily empty while work is in flight
+Strategist fires before halt check in tick() — newly pushed gap goal prevents halt on same tick
+bootstrap skip-if-exists is a prerequisite for strategist to accumulate gap closures across sessions
+GAP_TEMPLATES lives as module-level constant in run_loop.py — inspectable, easy to extend
 
 Conflicts or Ambiguities Surfaced:
 
-Skeptic is applying integration design standard to an analysis task — evaluator overreach confirmed
-Option A (goal decomposition) selected over Option B (challenge prompt patch) — not yet implemented
+None open
 
-Last Query Received:
-
-Skeptic rejecting planner output on integration grounds for an analysis-scoped goal. Decision: decompose into two sequential goals. Child goal descriptions need capability keywords for can_handle() routing. Implementation pending in next session.
+Last Known State:
+run_loop.py patched and confirmed running. Strategist is live. Next run will be the first test of gap-driven goal generation firing after queue exhaustion. Watch for: strategist_goal_pushed events in the log, gap goals routing correctly via can_handle(), and resolve_gap() firing in consensus on commit.

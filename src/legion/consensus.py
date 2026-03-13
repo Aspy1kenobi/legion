@@ -95,7 +95,6 @@ def _parse_verdict(raw: str) -> dict:
     in the event log and the low confidence marks the belief as unreviewed.
     """
     try:
-        # Strip markdown code fences if the model wrapped its JSON
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
@@ -150,9 +149,9 @@ class ConsensusEngine:
     def __init__(
         self,
         world_model:      "SharedWorldModel",
-        config,                                 # Config from config.py
-        evaluative_nodes: list["LegionNode"],   # nodes with role_type=="evaluative"
-        max_retries:      int = 2,              # how many times a goal can be rejected before escalation
+        config,
+        evaluative_nodes: list["LegionNode"],
+        max_retries:      int = 2,
     ):
         self.wm               = world_model
         self.config           = config
@@ -183,11 +182,6 @@ class ConsensusEngine:
         """
         Run the challenge/accept protocol for a completed goal.
 
-        Args:
-            goal:     The goal that was just completed.
-            result:   The output produced by the procedural node.
-            producer: Name of the node that produced the result.
-
         Returns:
             True  → result committed as a belief, goal remains complete.
             False → result rejected, goal returned to pending for retry.
@@ -195,7 +189,6 @@ class ConsensusEngine:
         evaluator = self._select_evaluator()
 
         if evaluator is None:
-            # No evaluative node available — commit with reduced confidence
             await self._commit(
                 goal=goal,
                 result=result,
@@ -206,7 +199,6 @@ class ConsensusEngine:
             )
             return True
 
-        # Mark evaluator busy for the duration of the challenge call
         record = self.wm.nodes[evaluator.name]
         record.status          = "busy"
         record.current_goal_id = goal.id
@@ -240,7 +232,6 @@ class ConsensusEngine:
                 challenged=True,
             )
             return True
-
         else:
             await self._reject(goal, verdict, evaluator.name)
             return False
@@ -260,7 +251,7 @@ class ConsensusEngine:
         context = self.wm.format_context_for_prompt(
             query=goal.description,
             top_k=4,
-            agent_filter=None,  # evaluator sees the full collective context
+            agent_filter=None,
         )
 
         messages = [
@@ -299,6 +290,19 @@ class ConsensusEngine:
             tags=[goal.id, "consensus"],
             evidence=[reason],
         )
+
+        # If this goal was generated to close a gap, mark that gap resolved
+        if goal.closes_gap:
+            await self.wm.resolve_gap(goal.closes_gap)
+            await self.wm.add_event(
+                agent="consensus",
+                event_type="gap_resolved",
+                content=f"Gap resolved: {goal.closes_gap} (closed by goal: {goal.description})",
+                importance=0.8,
+                goal_id=goal.id,
+                tags=["gap", "resolved"],
+            )
+
         challenged_str = "challenged+accepted" if challenged else "unchallenged"
         await self.wm.add_event(
             agent="consensus",
@@ -314,8 +318,8 @@ class ConsensusEngine:
 
     async def _reject(
         self,
-        goal:          "Goal",
-        verdict:       dict,
+        goal:           "Goal",
+        verdict:        dict,
         evaluator_name: str,
     ) -> None:
         """
@@ -324,7 +328,6 @@ class ConsensusEngine:
         Tracks rejection count via a belief with low confidence.
         If max_retries exceeded, marks goal abandoned and logs escalation.
         """
-        # Use a rejection-tracking belief to count retries across sessions
         retry_belief_id = f"retry_count_{goal.id}"
         existing = self.wm.beliefs.get(retry_belief_id)
         retry_count = int(existing.content) + 1 if existing else 1
@@ -332,7 +335,7 @@ class ConsensusEngine:
         await self.wm.add_belief(
             belief_id=retry_belief_id,
             content=str(retry_count),
-            confidence=0.0,         # 0.0 keeps it out of get_active_beliefs()
+            confidence=0.0,
             source="consensus",
             tags=["internal", "retry_counter"],
         )
@@ -364,7 +367,6 @@ class ConsensusEngine:
                 tags=["escalation", "human_required"],
             )
         else:
-            # Return to pending for retry — clear assignment so dispatcher can reclaim
             await self.wm.update_goal_status(goal.id, status="pending", clear_assignment=True)
 
     # ── Introspection ─────────────────────────────────────────────────────────

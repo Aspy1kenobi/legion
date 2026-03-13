@@ -138,58 +138,27 @@ dump_context.sh > session_context.txt
 _This section is updated by the Primary at the end of each session. Replace it
 entirely with the new block before handing off to the researcher._
 
-Next Target: Apply two fixes to run_loop.py and rerun:
-
-Raise max_retries in ConsensusEngine instantiation:
-
-pythonself.consensus = ConsensusEngine(self.wm, config, evaluative, max_retries=3)
-
-Add _abandon_orphaned_goals() method to RunLoop and call it in tick() after _run_consensus_on_completions():
-
-pythonasync def _abandon_orphaned_goals(self) -> None:
-    for goal in list(self.wm.goals.values()):
-        if goal.status != "pending":
-            continue
-        for dep_id in goal.depends_on:
-            dep = self.wm.goals.get(dep_id)
-            if dep and dep.status == "abandoned":
-                await self.wm.update_goal_status(goal.id, status="abandoned")
-                await self.wm.add_event(
-                    agent="run_loop",
-                    event_type="goal_escalated",
-                    content=(
-                        f"Goal abandoned: dependency {dep_id} was abandoned.\n"
-                        f"Blocked goal: {goal.description}"
-                    ),
-                    importance=0.9,
-                    goal_id=goal.id,
-                    tags=["orphaned", "escalation"],
-                )
-                self._log(f"Orphan abandoned: {goal.id}", goal.description[:60])
-Expected outcome after fixes: either planner succeeds within 3 attempts and both children complete cleanly, or child 1 is abandoned and child 2 is immediately orphan-abandoned, auto_halt triggers, no more infinite spinning.
 Completed this session:
 
-Created dump_context.sh for clean session handoffs
-Diagnosed and resolved repo root vs src/legion/ path confusion — src/legion/ is canonical, no duplicate files exist
-Anchored _WM_PATH to run_loop.py's file location — invocation directory no longer matters
-Implemented GoalStack.decompose() usage in run_loop.startup() — parent + 2 sequential children
-Implemented _maybe_complete_parent() in goal_stack.py — parent auto-completes when all children done, recursive for arbitrary depth
-Confirmed decomposition and sequential dependency working correctly
-Confirmed parent auto-completion working correctly (run 2 at 14:28)
-Identified max_retries=2 too low — skeptic rejecting planner twice on broad analysis goals
-Identified orphaned goal bug — abandoned goal leaves dependent children permanently pending, blocking auto_halt
+Applied max_retries=3 fix to ConsensusEngine instantiation
+Implemented _abandon_orphaned_goals() in RunLoop, wired into tick()
+Confirmed clean single-goal run (1 goal, committed, auto-halt)
+Implemented LLM-driven decomposition in _planner_fn — single structured JSON call, planner decides atomicity autonomously
+Added stub engineer node — absorbs implementation subgoals, logs intent
+Diagnosed unbounded recursion from run log + world model inspection
+Implemented MAX_DECOMPOSE_DEPTH = 2 with _goal_depth() traversal and hard code guard in decompose path
+Confirmed clean bounded run: 7 goals, 7 committed, 0 pending, 0 abandoned, clean auto-halt
 
 Pending:
 
-Apply the two fixes above and confirm clean run to auto_halt
+Real engineer node (currently stub — logs intent, no LLM call)
+Ethicist node (evaluator pool has only skeptic)
+Self-directed goal generation — Legion producing its own next goals from committed beliefs
 Remove bootstrap print statements once pipeline stable
-Engineer node (procedural, capabilities: implement/code/test/build)
-Ethicist node (evaluative, add to ConsensusEngine evaluator pool)
-LLM-driven goal decomposition (Planner calls decompose() autonomously)
 
-Open Questions / Blockers:
+Open Questions:
 
-Skeptic rejection rate is high on broad goals — may need prompt tuning or goal scoping adjustment after retry fix confirmed
-can_handle() keyword matching still fragile — monitor as goal descriptions evolve
+Proactive vs reactive boundary: should Legion generate its own next goals from committed beliefs, or is that human-driven?
+Skeptic rejection rate on broad goals — monitor now that depth limit is in place
 
 Last Query to Research Resource: None this session.

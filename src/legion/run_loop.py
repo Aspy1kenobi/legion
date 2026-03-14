@@ -505,52 +505,29 @@ class RunLoop:
     # ── Tick ──────────────────────────────────────────────────────────────────
 
     async def tick(self) -> float:
-        """
-        One tick: dispatch → consensus → strategist → halt-check.
-
-        Tick order is load-bearing:
-          1. dispatch_all()                  — do the work
-          2. _run_consensus_on_completions() — commit results
-          3. _run_strategist()               — refill queue from gaps
-          4. _should_halt() (in run())       — halt only after strategist fires
-
-        The strategist must run before the halt check. If halt fires on an
-        empty queue before the strategist has a chance to push gap goals,
-        Legion shuts down after the first goal completes instead of pursuing
-        its known architectural gaps autonomously.
-        """
         self._tick_count += 1
         self._log(f"── Tick {self._tick_count} ──────────────────────")
 
-        # 1. Dispatch all eligible goals concurrently
+        # 1. Dispatch
         dispatch_result = await self.dispatcher.dispatch_all()
         self._log("Dispatch", dispatch_result)
 
-        # 2. Consensus: challenge/accept any newly completed goals
+        # 2. Consensus — this was missing, replaced by dead nested defs
         await self._run_consensus_on_completions()
 
-        # 3. Strategist: push gap goals if queue is now empty
-        #    Must happen BEFORE _should_halt() is evaluated in run()
+        # 3. Strategist
         new_goals = await _run_strategist(self.wm, self.gs)
         if new_goals:
             self._log("Strategist", f"pushed {new_goals} gap goal(s)")
 
-        # 4. Status snapshot (read AFTER strategist so counts are accurate)
+        # 4. Status snapshot
         wm_status = self.wm.status()
         self._log("World model", wm_status)
 
-        # Adaptive sleep
         has_work = wm_status["goals_active"] > 0 or wm_status["goals_pending"] > 0
         return TICK_INTERVAL_ACTIVE if has_work else TICK_INTERVAL_IDLE
-
+    
     async def _run_consensus_on_completions(self) -> None:
-        """
-        Find recently completed goals that haven't been through consensus yet
-        and run the challenge/accept protocol on them.
-
-        Detection: a goal is "needs consensus" if status=="complete" and
-        no belief with id belief_{goal.id} exists in wm.beliefs.
-        """
         from consensus import _belief_id
 
         needs_consensus = [
@@ -560,7 +537,6 @@ class RunLoop:
         ]
 
         for goal in needs_consensus:
-            # Find the most recent node_output event for this goal
             relevant_events = [
                 e for e in reversed(self.wm.events)
                 if e.goal_id == goal.id and e.event_type == "node_output"
@@ -633,8 +609,12 @@ class RunLoop:
     # ── Shutdown ──────────────────────────────────────────────────────────────
 
     async def shutdown(self) -> None:
-        """Persist state and log final status."""
         if self.wm:
+            abandoned = [g for g in self.wm.goals.values() if g.status == "abandoned"]
+            if abandoned:
+                self._log(f"WARNING: {len(abandoned)} goal(s) abandoned (max retries exceeded):")
+                for g in abandoned:
+                    self._log(f"  ✗ {g.id}: {g.description[:80]}")
             await self.wm.save()
             self._log("Shutdown complete", self.wm.status())
 

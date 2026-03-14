@@ -24,11 +24,35 @@ Async boundary:
     - Callers in run_loop.py will be async — this matches the pattern in debate_async.py
 """
 
+import re
 import asyncio
 from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from world_model import SharedWorldModel, Goal
+
+# Trigger keywords: if a goal description contains any of these, _planner_fn
+# routes to llm_decompose() instead of producing a plan string.
+DECOMPOSE_TRIGGERS = frozenset(["decompose", "break down", "break into", "split into", "subdivide"])
+
+# Prompt contract for llm_decompose — system prompt is strict about output format.
+_DECOMPOSE_SYSTEM = (
+    "You are a goal decomposition engine in a multi-agent AI collective. "
+    "Your only job is to break a high-level goal into concrete, actionable subgoals. "
+    "Output between 2 and 5 subgoals as a numbered list. "
+    "Each line must start with a number and period (e.g. '1. '). "
+    "Output ONLY the numbered list — no preamble, no explanation, no blank lines between items."
+)
+
+_DECOMPOSE_USER = (
+    "GOAL TO DECOMPOSE: {goal_description}\n\n"
+    "COLLECTIVE CONTEXT (use to make subgoals specific to what is already known):\n"
+    "{context}\n\n"
+    "Break this goal into 2–5 concrete subgoals. "
+    "Each subgoal must be independently completable by a single agent. "
+    "Subgoals will execute sequentially in the order you list them. "
+    "Output the numbered list only."
+)
 
 
 class GoalStack:
@@ -64,7 +88,6 @@ class GoalStack:
         source:      str   = "human",
         parent_id:   Optional[str] = None,
         depends_on:  Optional[list[str]] = None,
-        closes_gap:  Optional[str] = None,
     ) -> "Goal":
         """
         Add a new goal to the collective's work queue.
@@ -78,9 +101,6 @@ class GoalStack:
             parent_id:   Set by decompose(). Marks this as a subgoal.
             depends_on:  List of goal IDs that must be complete before this
                          goal becomes eligible for pop_next().
-            closes_gap:  belief_id of a gap belief this goal is intended to
-                         close. Set by the strategist. Consensus reads it on
-                         commit and marks the gap resolved.
 
         Returns:
             The newly created Goal (from world_model.Goal).
@@ -91,7 +111,6 @@ class GoalStack:
             source=source,
             parent_id=parent_id,
             depends_on=depends_on or [],
-            closes_gap=closes_gap,
         )
         await self.wm.add_event(
             agent=source,
@@ -121,6 +140,8 @@ class GoalStack:
             The claimed Goal, or None.
         """
         candidates = self.wm.get_pending_goals()
+        # Filter out goals already assigned to another node
+        # (get_pending_goals returns status=="pending", assigned_to may still be None)
         unassigned = [g for g in candidates if g.assigned_to is None]
 
         if not unassigned:
@@ -135,6 +156,7 @@ class GoalStack:
             importance=goal.priority,
             goal_id=goal.id,
         )
+        # Return the updated goal object
         return self.wm.goals[goal.id]
 
     async def complete(self, goal_id: str, result: str, node_id: str = "unknown") -> None:
@@ -217,6 +239,8 @@ class GoalStack:
             raise KeyError(f"Goal '{goal_id}' not found in world model.")
 
         parent = self.wm.goals[goal_id]
+
+        # Inherit parent priority; children can be adjusted after creation
         priority = parent.priority
         created: list["Goal"] = []
         prev_id: Optional[str] = None
@@ -232,6 +256,7 @@ class GoalStack:
             created.append(child)
             prev_id = child.id
 
+        # Mark parent active — it tracks child completion, not direct execution
         await self.wm.update_goal_status(goal_id, status="active")
         await self.wm.add_event(
             agent=source,
@@ -245,6 +270,99 @@ class GoalStack:
         )
 
         return created
+
+    async def llm_decompose(
+        self,
+        goal_id: str,
+        config,
+        source:  str = "planner",
+    ) -> str:
+        """
+        LLM-driven decomposition: ask the LLM to break a goal into subgoals,
+        parse the numbered-list response, and call decompose() with the result.
+
+        This is the autonomous counterpart to the manual decompose() call.
+        It owns the full operation: LLM call → parse → push subgoals → return
+        a confirmation string suitable for passing to gs.complete().
+
+        Args:
+            goal_id: The goal to decompose. Must be pending or active.
+            config:  Config instance (for call_llm routing).
+            source:  Node name for event attribution (default: "planner").
+
+        Returns:
+            A confirmation string describing what was decomposed and into what.
+            Suitable as the result argument to gs.complete().
+
+        Raises:
+            KeyError:   If goal_id not found in world model.
+            ValueError: If LLM output contains no parseable subgoals.
+                        Caller (dispatcher) will catch this and mark the goal
+                        failed, triggering a retry on the next tick.
+        """
+        from llm_client import call_llm
+
+        if goal_id not in self.wm.goals:
+            raise KeyError(f"Goal '{goal_id}' not found in world model.")
+
+        goal    = self.wm.goals[goal_id]
+        context = self.wm.format_context_for_prompt(goal.description, top_k=3)
+
+        messages = [
+            {"role": "system", "content": _DECOMPOSE_SYSTEM},
+            {
+                "role": "user",
+                "content": _DECOMPOSE_USER.format(
+                    goal_description=goal.description,
+                    context=context or "(no prior collective context)",
+                ),
+            },
+        ]
+
+        raw, _ = await call_llm(messages, config)
+
+        # Parse numbered list: match lines starting with "N." or "N)"
+        subgoals = []
+        for line in raw.splitlines():
+            line = line.strip()
+            m = re.match(r'^\d+[.)]\s+(.+)$', line)
+            if m:
+                text = m.group(1).strip()
+                if text:
+                    subgoals.append(text)
+
+        # Enforce width cap — discard anything beyond 5
+        subgoals = subgoals[:5]
+
+        # Guarantee capability match: prefix each subgoal with "implement:"
+        # so the planner's can_handle() always claims it. Without this,
+        # LLM-generated descriptions rarely contain capability keywords
+        # (gap_can_handle_keyword — documented in bootstrap beliefs).
+        subgoals = [
+            s if s.lower().startswith("implement") else f"implement: {s}"
+            for s in subgoals
+        ]
+
+        if not subgoals:
+            raise ValueError(
+                f"llm_decompose: LLM returned no parseable subgoals for goal "
+                f"'{goal_id}'. Raw output: {raw[:300]!r}"
+            )
+
+        await self.decompose(goal_id, subgoals, source=source)
+
+        summary = (
+            f"Decomposed '{goal.description}' into {len(subgoals)} subgoals:\n"
+            + "\n".join(f"  {i+1}. {s}" for i, s in enumerate(subgoals))
+        )
+        await self.wm.add_event(
+            agent=source,
+            event_type="goal_llm_decomposed",
+            content=summary,
+            importance=goal.priority,
+            goal_id=goal_id,
+        )
+        return summary
 
     # ── Read path (sync) ──────────────────────────────────────────────────────
 
@@ -306,7 +424,7 @@ class GoalStack:
 
         if pending:
             lines.append("\nPENDING (next up):")
-            for g in self.wm.get_pending_goals()[:3]:
+            for g in self.wm.get_pending_goals()[:3]:  # top 3 only
                 lines.append(f"  [{g.priority:.1f}] {g.description}")
             if len(pending) > 3:
                 lines.append(f"  ... and {len(pending) - 3} more")

@@ -174,11 +174,15 @@ class Dispatcher:
 
     # ── Execution ─────────────────────────────────────────────────────────────
 
-    async def dispatch_one(self, goal: "Goal") -> bool:
+    async def dispatch_one(self, goal: "Goal") -> Optional[bool]:
         """
         Full claim → execute → release cycle for a single goal.
 
-        Returns True on success, False on failure.
+        Returns:
+            True  — goal executed successfully
+            False — goal executed but raised an exception
+            None  — no capable idle node found; goal stays pending (skipped)
+
         Never raises — all exceptions are caught, logged, and converted
         to goal failure events so run_loop.py stays alive.
         """
@@ -193,7 +197,7 @@ class Dispatcher:
                 importance=0.3,
                 goal_id=goal.id,
             )
-            return False
+            return None
 
         await self._claim(node, goal)
 
@@ -245,10 +249,11 @@ class Dispatcher:
 
         dispatched = sum(1 for r in results if r is True)
         failed     = sum(1 for r in results if r is False)
+        skipped    = sum(1 for r in results if r is None)
 
         return {
             "dispatched": dispatched,
-            "skipped":    len(candidates) - dispatched - failed,
+            "skipped":    skipped,
             "failed":     failed,
         }
 

@@ -4,10 +4,10 @@ async def bootstrap_beliefs(wm: "SharedWorldModel") -> int:
     findings, constraints, and gaps before the first tick.
 
     Called once during RunLoop.startup() after wm.load(). Safe to call
-    on subsequent runs — existing beliefs are skipped, so accumulated
-    state (closed gaps, updated findings) is preserved across restarts.
+    on subsequent runs — add_belief() updates existing beliefs in place,
+    so re-running does not duplicate entries.
 
-    Returns the number of NEW beliefs written (0 on a fully seeded wm).
+    Returns the number of beliefs written.
     """
     beliefs = [
 
@@ -33,8 +33,8 @@ async def bootstrap_beliefs(wm: "SharedWorldModel") -> int:
          1.0),
 
         ("module_goal_stack_pending",
-         "goal_stack.py has no LLM-driven decomposition. "
-         "Callers provide subgoal descriptions manually.",
+         "goal_stack.py has LLM-driven decomposition via llm_decompose(). "
+         "Triggered by DECOMPOSE_TRIGGERS keywords in goal descriptions.",
          1.0),
 
         # ── Experimental findings ─────────────────────────────────────────────
@@ -146,12 +146,8 @@ async def bootstrap_beliefs(wm: "SharedWorldModel") -> int:
 
     print("[bootstrap] starting", flush=True)
 
-    written = 0
-    for belief_id, content, confidence in beliefs:
-        if belief_id in wm.beliefs:
-            print(f"[bootstrap] skipping existing: {belief_id}", flush=True)
-            continue
-        print(f"[bootstrap] writing: {belief_id}", flush=True)
+    for i, (belief_id, content, confidence) in enumerate(beliefs):
+        print(f"[bootstrap] writing {i}: {belief_id}", flush=True)
         await wm.add_belief(
             belief_id=belief_id,
             content=content,
@@ -159,11 +155,6 @@ async def bootstrap_beliefs(wm: "SharedWorldModel") -> int:
             source="bootstrap",
             tags=["bootstrap"],
         )
-        written += 1
 
-    print(
-        f"[bootstrap] done — {written} new beliefs written, "
-        f"{len(wm.beliefs)} total in wm",
-        flush=True,
-    )
-    return written
+    print(f"[bootstrap] done, wrote {len(beliefs)}", flush=True)
+    return len(beliefs)

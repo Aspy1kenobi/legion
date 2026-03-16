@@ -107,28 +107,48 @@ async def _planner_fn(goal, wm: SharedWorldModel) -> str:
         return result
 
     # ── Plan route ────────────────────────────────────────────────────────────
-    context    = wm.format_context_for_prompt(goal.description, top_k=4)
-    beliefs    = wm.retrieve_context(goal.description, top_k=3)
-    belief_str = "\n".join(f"- {e.content}" for e in beliefs) or "(none yet)"
+    # Episodic context: recent events relevant to this goal
+    event_context = wm.format_context_for_prompt(goal.description, top_k=4)
+
+    # Belief context: committed facts filtered by relevance to the goal.
+    # top_k=5 to cover cross-cutting goals that touch multiple subsystems.
+    # Uses retrieve_context against beliefs converted to pseudo-events so the
+    # same recency+importance+relevance scoring applies.
+    # Simpler path: filter active beliefs by keyword match against goal description.
+    desc_words = set(goal.description.lower().split())
+    all_beliefs = wm.get_active_beliefs(min_confidence=0.5)
+    # Score each belief by word overlap with goal description
+    def _belief_relevance(b):
+        b_words = set(b.content.lower().split())
+        return len(b_words & desc_words)
+    ranked_beliefs = sorted(all_beliefs, key=_belief_relevance, reverse=True)
+    top_beliefs = ranked_beliefs[:5]
+    belief_str = "\n".join(f"- {b.content}" for b in top_beliefs) or "(none yet)"
 
     messages = [
         {
             "role": "system",
             "content": (
-                "You are a strategic planner in a multi-agent AI collective. "
+                "You are a strategic planner embedded inside a running multi-agent "
+                "AI system called Legion. You have direct access to the collective's "
+                "committed beliefs and event history — you are not an external "
+                "consultant. When analyzing system components, reason about them "
+                "directly using the context provided. Do not ask for access to "
+                "information already present in the context below. "
                 "Your output will be reviewed by an evaluative agent before being "
-                "committed as a collective belief. Be specific and actionable. "
-                "Connect your plan to what the collective already knows."
+                "committed as a collective belief. Be specific and actionable."
             ),
         },
         {
             "role": "user",
             "content": (
                 f"GOAL: {goal.description}\n\n"
-                f"RELEVANT COLLECTIVE CONTEXT:\n{belief_str}\n\n"
-                f"RECENT COLLECTIVE ACTIVITY:\n{context or '(none)'}\n\n"
-                "Produce a concrete plan to accomplish this goal. "
-                "Identify the key steps, dependencies, and the single most "
+                f"RELEVANT COLLECTIVE BELIEFS (committed facts about this system):\n"
+                f"{belief_str}\n\n"
+                f"RECENT COLLECTIVE ACTIVITY:\n{event_context or '(none yet)'}\n\n"
+                "Produce a concrete analysis or plan to accomplish this goal. "
+                "Reason directly from the beliefs and context above. "
+                "Identify key findings, dependencies, and the single most "
                 "important action to take first."
             ),
         },
@@ -441,13 +461,15 @@ async def main(
 
 
 if __name__ == "__main__":
-    # Default run: seed a decomposition goal to exercise llm_decompose().
-    # The "decompose" trigger word routes _planner_fn to GoalStack.llm_decompose()
-    # instead of the plan route. Subgoals are pushed to the stack autonomously.
+    # Standard plan path test: goal contains no DECOMPOSE_TRIGGERS keywords,
+    # so _planner_fn routes to the plan path, not llm_decompose().
+    # Expected: single goal completed, no child goals pushed, planner output
+    # is specifically about the dispatcher rather than generic planning boilerplate.
     asyncio.run(main(
         initial_goals=[
-            "Decompose the task of implementing LLM-driven goal decomposition "
-            "in Legion into concrete implementation subgoals."
+            "Analyze the dispatcher's node selection logic and identify whether "
+            "load balancing across multiple nodes of the same role_type would "
+            "improve throughput."
         ],
-        max_ticks=10,   # Safe default — remove for continuous operation
+        max_ticks=10,
     ))

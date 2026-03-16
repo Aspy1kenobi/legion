@@ -216,18 +216,157 @@ async def _skeptic_fn(goal, wm: SharedWorldModel) -> str:
     return result
 
 
+async def _engineer_fn(goal, wm: SharedWorldModel) -> str:
+    """
+    Procedural node: produces concrete implementations, code, and artifacts.
+    Where the planner produces plans, the engineer produces things that can
+    be directly built or evaluated. Output must be substantive — no pass stubs.
+    """
+    from llm_client import call_llm
+    from config import Config
+
+    config = Config()
+    context = wm.format_context_for_prompt(goal.description, top_k=4)
+    # Narrow belief injection: only the most relevant committed truths.
+    # Prevents anchoring on verbose planner output instead of the goal itself.
+    relevant_beliefs = wm.retrieve_context(goal.description, top_k=3)
+    belief_str = "\n".join(
+        f"- [{e.agent}] {e.content[:200]}" for e in relevant_beliefs
+    ) or "(none yet)"
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a pragmatic engineer in a multi-agent AI collective. "
+                "Your output will be reviewed by an evaluative agent before being "
+                "committed as a collective belief. Produce concrete, specific "
+                "artifacts: working code, pseudocode with real logic, data structures, "
+                "or step-by-step implementation instructions with enough detail to build from.\n\n"
+                "HARD RULES:\n"
+                "- No pass stubs. If you cannot implement something fully, implement "
+                "the parts you can and explicitly state what remains and why.\n"
+                "- No abstract plans or process descriptions — that is the planner's job.\n"
+                "- Follow existing codebase patterns exactly:\n"
+                "  * Language: Python 3.11, asyncio\n"
+                "  * LLM calls: call_llm(messages, config) from llm_client.py\n"
+                "  * Node fn signature: async def fn(goal, wm: SharedWorldModel) -> str\n"
+                "  * Persistence: wm.add_event() only — no direct file writes\n"
+                "  * No new dependencies without explicit justification"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"GOAL: {goal.description}\n\n"
+                f"RELEVANT COLLECTIVE CONTEXT:\n{belief_str}\n\n"
+                f"RECENT ACTIVITY:\n{context or '(none)'}\n\n"
+                "Produce the implementation. If this involves Python code, write code "
+                "that fits directly into the existing codebase. If it involves a design "
+                "decision, produce a concrete spec with enough detail that an engineer "
+                "could implement it without asking follow-up questions."
+            ),
+        },
+    ]
+
+    result, _ = await call_llm(messages, config)
+    await wm.add_event(
+        agent="engineer",
+        event_type="node_output",
+        content=result,
+        importance=goal.priority,
+        goal_id=goal.id,
+    )
+    return result
+
+
+async def _ethicist_fn(goal, wm: SharedWorldModel) -> str:
+    """
+    Evaluative node: assesses outputs for safety, fairness, and downstream risk.
+    Fires during consensus as a second challenger alongside the skeptic.
+    Where the skeptic finds logical failure modes, the ethicist asks whether
+    the output is safe to commit given its effects, precedents, and blind spots.
+    """
+    from llm_client import call_llm
+    from config import Config
+
+    config = Config()
+    # Self-retrieval mirrors the skeptic pattern — ethicist reads its own
+    # prior verdicts to maintain consistent evaluative stance across goals.
+    self_context = wm.format_context_for_prompt(
+        goal.description, top_k=3, agent_filter="ethicist"
+    )
+    group_context = wm.format_context_for_prompt(goal.description, top_k=4)
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are an ethicist in a multi-agent AI collective. "
+                "Your job is to assess whether outputs are safe to commit as "
+                "collective beliefs — not just whether they are logically correct, "
+                "but whether acting on them could cause harm, entrench bad precedents, "
+                "or affect stakeholders who aren't represented in the discussion.\n\n"
+                "You are not a blocker. You accept good work. You reject or flag work "
+                "that has unexamined downstream effects, privacy implications, fairness "
+                "problems, or that would make the collective harder to oversee or correct.\n\n"
+                "You must respond with a single JSON object and nothing else:\n"
+                '{"verdict": "accept" | "reject", "reason": "<one sentence>", '
+                '"confidence": <float 0.0-1.0>}'
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"GOAL: {goal.description}\n\n"
+                f"YOUR PRIOR ETHICAL ASSESSMENTS ON RELATED TOPICS:\n"
+                f"{self_context or '(none)'}\n\n"
+                f"COLLECTIVE ACTIVITY:\n{group_context or '(none)'}\n\n"
+                "Assess whether this goal and its approach are safe to commit. Consider:\n"
+                "- Who could be affected by this, including indirectly?\n"
+                "- Does this set a precedent that limits future human oversight?\n"
+                "- Are there privacy, autonomy, or transparency concerns?\n"
+                "- Is there anything here that should require human review before acting?\n\n"
+                "Respond with JSON only."
+            ),
+        },
+    ]
+
+    result, _ = await call_llm(messages, config)
+    await wm.add_event(
+        agent="ethicist",
+        event_type="node_output",
+        content=result,
+        importance=goal.priority,
+        goal_id=goal.id,
+    )
+    return result
+
+
 def _build_default_nodes() -> list[LegionNode]:
     """
     Construct the default Legion node pool.
-    Extend this list as new node types are added.
+
+    Capability vocabulary is partitioned deliberately — any overlap causes
+    systematic misrouting. Planner holds strategic verbs only; engineer holds
+    execution verbs. The "implement: " prefix in llm_decompose() guarantees
+    subgoals route to engineer, not back to planner.
     """
     return [
         LegionNode(
             name="planner",
             role_type="procedural",
-            capabilities=["plan", "decompose", "analyze", "design", "build",
-                          "implement", "create", "define", "structure"],
+            # Strategic verbs only — no execution vocabulary
+            capabilities=["plan", "decompose", "analyze", "design", "define", "structure"],
             fn=_planner_fn,
+        ),
+        LegionNode(
+            name="engineer",
+            role_type="procedural",
+            # Execution verbs only — disjoint from planner
+            capabilities=["implement", "build", "code", "write", "create",
+                          "develop", "construct", "generate"],
+            fn=_engineer_fn,
         ),
         LegionNode(
             name="skeptic",
@@ -235,6 +374,13 @@ def _build_default_nodes() -> list[LegionNode]:
             capabilities=["review", "evaluate", "assess", "check", "test",
                           "verify", "challenge", "audit"],
             fn=_skeptic_fn,
+        ),
+        LegionNode(
+            name="ethicist",
+            role_type="evaluative",
+            capabilities=["ethics", "values", "fairness", "harm", "safety",
+                          "oversight", "privacy", "risk"],
+            fn=_ethicist_fn,
         ),
     ]
 
@@ -461,15 +607,15 @@ async def main(
 
 
 if __name__ == "__main__":
-    # Standard plan path test: goal contains no DECOMPOSE_TRIGGERS keywords,
-    # so _planner_fn routes to the plan path, not llm_decompose().
-    # Expected: single goal completed, no child goals pushed, planner output
-    # is specifically about the dispatcher rather than generic planning boilerplate.
+    # Parent auto-completion + engineer routing test.
+    # "decompose" trigger → planner calls llm_decompose() → pushes subgoals
+    # prefixed "implement: " → engineer claims and executes each subgoal →
+    # _maybe_complete_parent() fires when last sibling completes → parent
+    # auto-completes → goals_active=0, goals_pending=0 → auto_halt fires.
     asyncio.run(main(
         initial_goals=[
-            "Analyze the dispatcher's node selection logic and identify whether "
-            "load balancing across multiple nodes of the same role_type would "
-            "improve throughput."
+            "decompose the Legion dispatcher into its core responsibilities "
+            "and implement a concrete design note for each one"
         ],
-        max_ticks=10,
+        max_ticks=20,
     ))

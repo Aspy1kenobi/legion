@@ -167,6 +167,9 @@ class GoalStack:
         become eligible for pop_next() automatically — no explicit unblocking
         needed because eligibility is computed dynamically in get_pending_goals().
 
+        Also triggers _maybe_complete_parent() to auto-complete the parent goal
+        if all siblings are now in a terminal state.
+
         Args:
             goal_id: ID of the goal to complete.
             result:  The outcome or artifact produced. Stored as an event
@@ -185,6 +188,46 @@ class GoalStack:
             importance=goal.priority,
             goal_id=goal_id,
         )
+        await self._maybe_complete_parent(goal_id, node_id)
+
+    async def _maybe_complete_parent(self, child_id: str, node_id: str) -> None:
+        """
+        If the just-completed goal has a parent, check whether all siblings
+        are in a terminal state (complete or abandoned). If so, mark the parent
+        complete and recurse upward to handle nested decompositions.
+
+        Called automatically from complete() — never needs to be called directly.
+        The sibling walk is O(goals) but goals are bounded and this fires only
+        at natural completion moments, not on every tick.
+        """
+        child = self.wm.goals.get(child_id)
+        if child is None or child.parent_id is None:
+            return
+
+        parent_id = child.parent_id
+        siblings = [g for g in self.wm.goals.values() if g.parent_id == parent_id]
+
+        terminal = {"complete", "abandoned"}
+        if not all(g.status in terminal for g in siblings):
+            return
+
+        parent = self.wm.goals.get(parent_id)
+        if parent is None or parent.status != "active":
+            return
+
+        await self.wm.update_goal_status(parent_id, status="complete")
+        await self.wm.add_event(
+            agent=node_id,
+            event_type="goal_complete",
+            content=(
+                f"Parent goal auto-completed: all {len(siblings)} subgoals finished — "
+                f"{parent.description}"
+            ),
+            importance=parent.priority,
+            goal_id=parent_id,
+        )
+        # Recurse: this parent may itself be a child of a higher goal
+        await self._maybe_complete_parent(parent_id, node_id)
 
     async def fail(self, goal_id: str, reason: str, node_id: str = "unknown") -> None:
         """
@@ -351,6 +394,12 @@ class GoalStack:
 
         await self.decompose(goal_id, subgoals, source=source)
 
+        # Design note: the decompose goal (goal_id) will be completed by the
+        # dispatcher calling gs.complete() after this method returns. This is
+        # intentional — the parent's "work" was the decomposition itself, not
+        # the execution of children. Children are independent goals that
+        # complete on their own; _maybe_complete_parent() handles the
+        # grandparent case when trees are more than one level deep.
         summary = (
             f"Decomposed '{goal.description}' into {len(subgoals)} subgoals:\n"
             + "\n".join(f"  {i+1}. {s}" for i, s in enumerate(subgoals))

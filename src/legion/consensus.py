@@ -166,14 +166,22 @@ class ConsensusEngine:
 
     def _select_evaluator(self) -> Optional["LegionNode"]:
         """
-        Find an idle evaluative node.
+        Find the least-used idle evaluative node (lowest tasks_completed).
+        Ties broken by dict insertion order (stable, arbitrary).
         Returns None if all evaluative nodes are busy — caller will skip challenge.
+
+        Least-used selection naturally rotates across evaluators when load is
+        equal and load-balances when it isn't. No explicit round-robin state needed.
         """
-        for node in self.evaluative_nodes.values():
-            record = self.wm.nodes.get(node.name)
-            if record and record.status == "idle":
-                return node
-        return None
+        idle = [
+            (self.wm.nodes[n.name].tasks_completed, n)
+            for n in self.evaluative_nodes.values()
+            if self.wm.nodes.get(n.name) and self.wm.nodes[n.name].status == "idle"
+        ]
+        if not idle:
+            return None
+        _, node = min(idle, key=lambda pair: pair[0])
+        return node
 
     # ── Core protocol ─────────────────────────────────────────────────────────
 

@@ -134,13 +134,15 @@ async def bootstrap_beliefs(wm: "SharedWorldModel") -> int:
          1.0),
 
         ("gap_engineer_node_missing",
-         "No Engineer node exists. Goals requiring implementation, "
-         "coding, or testing have no capable node.",
+         "Engineer node is registered. "
+         "Handles goals with: implement, build, code, write, create, develop, construct, generate. "
+         "Uses retrieve_context(top_k=3) for belief injection.",
          1.0),
 
         ("gap_ethicist_node_missing",
-         "No Ethicist node exists. "
-         "Consensus evaluator pool has only Skeptic.",
+         "Ethicist node is registered as second evaluative node in consensus pool. "
+         "Assesses safety, fairness, and human oversight concerns. "
+         "Returns JSON: {verdict, reason, confidence}.",
          1.0),
     ]
 

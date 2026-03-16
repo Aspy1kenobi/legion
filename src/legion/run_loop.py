@@ -62,6 +62,28 @@ from bootstrap_beliefs import bootstrap_beliefs
 TICK_INTERVAL_ACTIVE = 2.0   # seconds — work is in progress, check frequently
 TICK_INTERVAL_IDLE   = 10.0  # seconds — queue empty, no point hammering wm
 
+MAX_DECOMPOSE_DEPTH  = 2     # max parent-chain depth before decomposition is blocked
+
+# Goals the strategist pushes when the queue empties.
+# Vocabulary is intentionally disjoint from planner capabilities
+# ("plan", "analyze", "design", "structure", "decompose") and engineer
+# capabilities ("implement", "code", "build", "write", "create").
+# Strategist goals must not be claimable by either procedural node.
+#
+# NOTE: evaluative gap goals (assess, review, evaluate) will typically
+# be rejected by consensus because nodes lack ground-truth system access.
+# This is correct behavior — rejection is signal that the gap is real,
+# not a routing error. Procedural gap goals (design, implement) pass more
+# readily but produce design artifacts rather than verified closures.
+GAP_GOALS = [
+    "evaluate whether Legion's consensus protocol is correctly preventing "
+    "low-quality beliefs from being committed",
+    "assess the robustness of the dispatcher's node selection logic "
+    "against capability routing failures",
+    "review the world model event log for patterns indicating repeated "
+    "goal failures or orphaned subgoals",
+]
+
 # ── Node definitions ──────────────────────────────────────────────────────────
 # These are the Legion-native replacements for the agent functions in agents.py.
 # Each fn signature: async (goal: Goal, wm: SharedWorldModel) -> str
@@ -96,6 +118,27 @@ async def _planner_fn(goal, wm: SharedWorldModel) -> str:
     desc_lower = goal.description.lower()
     if any(trigger in desc_lower for trigger in DECOMPOSE_TRIGGERS):
         gs = GoalStack(wm)
+        # Enforce depth limit — prevent unbounded recursive decomposition.
+        # Inline walk: _goal_depth() lives on RunLoop, which _planner_fn
+        # cannot reference (it's a module-level fn). Same logic, no coupling.
+        depth = 0
+        current = wm.goals.get(goal.id)
+        while current and current.parent_id:
+            depth += 1
+            current = wm.goals.get(current.parent_id)
+        if depth >= MAX_DECOMPOSE_DEPTH:
+            result = (
+                f"[planner] Decompose depth limit ({MAX_DECOMPOSE_DEPTH}) reached "
+                f"for: {goal.description[:80]}. Producing flat plan instead."
+            )
+            await wm.add_event(
+                agent="planner",
+                event_type="node_output",
+                content=result,
+                importance=goal.priority,
+                goal_id=goal.id,
+            )
+            return result
         result = await gs.llm_decompose(goal.id, config, source="planner")
         await wm.add_event(
             agent="planner",
@@ -465,19 +508,25 @@ class RunLoop:
 
     async def tick(self) -> float:
         """
-        One tick: dispatch eligible goals, run consensus on completions.
+        One tick: dispatch eligible goals, run consensus on completions,
+        run strategist to fill gaps before halt check.
         Returns the sleep interval to use before the next tick.
         """
         self._tick_count += 1
         self._log(f"── Tick {self._tick_count} ──────────────────────")
+
+        # Abandon orphaned goals before dispatching so they don't block siblings
+        await self._abandon_orphaned_goals()
 
         # Dispatch all eligible goals concurrently
         dispatch_result = await self.dispatcher.dispatch_all()
         self._log("Dispatch", dispatch_result)
 
         # Run consensus on any goals that completed this tick
-        # (goals whose status just became "complete" but have no belief yet)
         await self._run_consensus_on_completions()
+
+        # Strategist fires BEFORE halt check — fills queue if empty
+        await self._run_strategist()
 
         # Status snapshot
         wm_status = self.wm.status()
@@ -521,6 +570,90 @@ class RunLoop:
             self._log(f"Consensus: evaluating {goal.id}")
             committed = await self.consensus.evaluate(goal, result, producer)
             self._log(f"Consensus: {'committed' if committed else 'rejected'}", goal.id)
+
+    async def _run_strategist(self) -> None:
+        """
+        Fires after consensus, before halt check.
+        If the goal queue is empty and no goals are active, push one
+        GAP_GOAL so the loop has something to work on next tick
+        instead of halting prematurely.
+
+        Rotates through GAP_GOALS by tracking how many have been pushed
+        as a belief. Halts cleanly once all gaps are exhausted.
+        """
+        assert self.wm is not None and self.gs is not None
+        s = self.wm.status()
+        if s["goals_pending"] > 0 or s["goals_active"] > 0:
+            return  # work in progress — strategist stands down
+
+        pushed_key = "strategist_gaps_pushed"
+        existing = self.wm.beliefs.get(pushed_key)
+        pushed_count = int(existing.content) if existing else 0
+
+        if pushed_count >= len(GAP_GOALS):
+            self._log("Strategist: all gaps exhausted, no new goals pushed")
+            return
+
+        description = GAP_GOALS[pushed_count]
+        await self.gs.push(description, priority=0.6, source="strategist")
+        self._log(
+            f"Strategist: pushed gap goal [{pushed_count + 1}/{len(GAP_GOALS)}]",
+            description[:60],
+        )
+
+        # Record count so we don't re-push on restart
+        await self.wm.add_belief(
+            belief_id=pushed_key,
+            content=str(pushed_count + 1),
+            confidence=0.0,   # internal tracking — kept out of active beliefs
+            source="strategist",
+            tags=["internal", "strategist"],
+        )
+
+    async def _abandon_orphaned_goals(self) -> None:
+        """
+        Find goals that are blocked by a failed/abandoned dependency and
+        mark them abandoned so they don't hold goals_active > 0 forever.
+
+        A goal is orphaned if:
+            - status is "pending"
+            - any goal in depends_on has status "abandoned"
+        """
+        assert self.wm is not None
+        for goal in list(self.wm.goals.values()):
+            if goal.status != "pending":
+                continue
+            for dep_id in goal.depends_on:
+                dep = self.wm.goals.get(dep_id)
+                if dep and dep.status == "abandoned":
+                    await self.wm.update_goal_status(goal.id, status="abandoned")
+                    await self.wm.add_event(
+                        agent="run_loop",
+                        event_type="goal_abandoned",
+                        content=(
+                            f"Orphaned goal abandoned: dependency '{dep_id}' failed.\n"
+                            f"Goal: {goal.description}"
+                        ),
+                        importance=0.5,
+                        goal_id=goal.id,
+                    )
+                    self._log(f"Orphan abandoned: {goal.id}")
+                    break
+
+    def _goal_depth(self, goal_id: str) -> int:
+        """
+        Return the depth of a goal in the parent chain.
+        Root goals (no parent) are depth 0.
+        Used for introspection and future callers with a RunLoop reference.
+        (_planner_fn inlines the same walk because it has no RunLoop reference.)
+        """
+        assert self.wm is not None
+        depth = 0
+        current = self.wm.goals.get(goal_id)
+        while current and current.parent_id:
+            depth += 1
+            current = self.wm.goals.get(current.parent_id)
+        return depth
 
     # ── Halt detection ────────────────────────────────────────────────────────
 

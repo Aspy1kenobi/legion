@@ -143,6 +143,9 @@ And paste the output to establish where the last session ended.
 
 ## Current known gaps (as of last session)
 
-- `gap_engineer_node_missing` — engineer node defined in run_loop but needs verification that output is proper async `_fn` functions, not ML class hallucinations
-- Parent auto-completion via `_maybe_complete_parent()` — needs verification it fires correctly when all siblings complete
-- Strategist gap goals — need a run with a non-decomposition goal to verify standard plan path after `_planner_fn` routing change
+- Parent auto-completion via `_maybe_complete_parent()` — needs verification
+  it fires correctly when all siblings complete
+- Strategist gap goals — verify strategist still pushes correctly after
+  _planner_fn routing change (no strategist run since that commit)
+- Engineer and ethicist nodes — defined in prior sessions but need a live
+  run to confirm routing and output quality

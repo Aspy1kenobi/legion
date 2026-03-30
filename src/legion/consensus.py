@@ -367,6 +367,9 @@ class ConsensusEngine:
 
         if retry_count >= self.max_retries:
             await self.wm.update_goal_status(goal.id, status="abandoned")
+            # Clean up the retry counter — it served its purpose and would
+            # otherwise accumulate permanently across long runs.
+            await self.wm.delete_belief(retry_belief_id)
             await self.wm.add_event(
                 agent="consensus",
                 event_type="goal_escalated",

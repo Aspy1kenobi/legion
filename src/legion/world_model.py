@@ -267,6 +267,21 @@ class SharedWorldModel:
             await self._save_unlocked()
         return belief
 
+    async def delete_belief(self, belief_id: str) -> bool:
+        """
+        Remove a belief by ID. Returns True if deleted, False if not found.
+
+        Primary use case: cleaning up internal tracking beliefs (e.g. retry_count_{goal_id})
+        after a goal is resolved or abandoned, so they don't accumulate across long runs.
+        Not called on gap_ beliefs — use resolve_gap() for those.
+        """
+        async with self._lock:
+            if belief_id not in self.beliefs:
+                return False
+            del self.beliefs[belief_id]
+            await self._save_unlocked()
+        return True
+
     async def add_goal(
         self,
         description: str,
@@ -284,15 +299,20 @@ class SharedWorldModel:
                     Set by the strategist. Consensus reads it on commit and
                     marks the gap belief as resolved.
         """
-        goal_id = f"goal_{len(self.goals):04d}_{datetime.now().strftime('%H%M%S')}"
-        now = datetime.now().isoformat()
-        goal = Goal(
-            id=goal_id, description=description, priority=priority,
-            status="pending", source=source, created_at=now, updated_at=now,
-            parent_id=parent_id, depends_on=depends_on or [],
-            closes_gap=closes_gap,
-        )
         async with self._lock:
+            # ID computed inside the lock so len(self.goals) is stable.
+            # Outside-lock computation causes a race: two concurrent callers
+            # can both read the same len before either write, land on the same
+            # ID within the same second, and the second write silently clobbers
+            # the first (asyncio doesn't protect against this at the read site).
+            goal_id = f"goal_{len(self.goals):04d}_{datetime.now().strftime('%H%M%S')}"
+            now = datetime.now().isoformat()
+            goal = Goal(
+                id=goal_id, description=description, priority=priority,
+                status="pending", source=source, created_at=now, updated_at=now,
+                parent_id=parent_id, depends_on=depends_on or [],
+                closes_gap=closes_gap,
+            )
             self.goals[goal_id] = goal
             await self._save_unlocked()
         return goal

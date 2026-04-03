@@ -47,6 +47,7 @@ sys.path.insert(0, _HERE)                          # src/legion/
 sys.path.insert(0, os.path.dirname(_HERE))         # src/
 
 import asyncio
+import json
 import signal
 from datetime import datetime
 from typing import Optional
@@ -154,13 +155,8 @@ async def _planner_fn(goal, wm: SharedWorldModel) -> str:
     event_context = wm.format_context_for_prompt(goal.description, top_k=4)
 
     # Belief context: committed facts filtered by relevance to the goal.
-    # top_k=5 to cover cross-cutting goals that touch multiple subsystems.
-    # Uses retrieve_context against beliefs converted to pseudo-events so the
-    # same recency+importance+relevance scoring applies.
-    # Simpler path: filter active beliefs by keyword match against goal description.
     desc_words = set(goal.description.lower().split())
     all_beliefs = wm.get_active_beliefs(min_confidence=0.5)
-    # Score each belief by word overlap with goal description
     def _belief_relevance(b):
         b_words = set(b.content.lower().split())
         return len(b_words & desc_words)
@@ -179,7 +175,12 @@ async def _planner_fn(goal, wm: SharedWorldModel) -> str:
                 "directly using the context provided. Do not ask for access to "
                 "information already present in the context below. "
                 "Your output will be reviewed by an evaluative agent before being "
-                "committed as a collective belief. Be specific and actionable."
+                "committed as a collective belief. Be specific and actionable.\n\n"
+                "IMPORTANT: Respond with a single JSON object and nothing else:\n"
+                '{"plan": "<your full plan text>", '
+                '"follow_on_goals": ["<goal 1>", "<goal 2>"]}\n'
+                "follow_on_goals is a list of 0–3 concrete next goals the collective "
+                "should pursue after completing this plan. Use an empty list if none."
             ),
         },
         {
@@ -192,20 +193,39 @@ async def _planner_fn(goal, wm: SharedWorldModel) -> str:
                 "Produce a concrete analysis or plan to accomplish this goal. "
                 "Reason directly from the beliefs and context above. "
                 "Identify key findings, dependencies, and the single most "
-                "important action to take first."
+                "important action to take first. "
+                "Then list 0–3 concrete follow-on goals for the collective."
             ),
         },
     ]
 
-    result, _ = await call_llm(messages, config)
+    raw, _ = await call_llm(messages, config)
+
+    # Defensive parse — malformed or missing keys fall back gracefully.
+    # Goal completion must never be blocked by a parse failure.
+    try:
+        parsed = json.loads(raw)
+        if not isinstance(parsed, dict):
+            raise ValueError("not a dict")
+        plan_text = parsed.get("plan", raw)
+        follow_on_goals = parsed.get("follow_on_goals", [])
+        if not isinstance(follow_on_goals, list):
+            follow_on_goals = []
+    except (json.JSONDecodeError, ValueError):
+        plan_text = raw
+        follow_on_goals = []
+
+    # Log the readable plan text, not the raw JSON envelope
     await wm.add_event(
         agent="planner",
         event_type="node_output",
-        content=result,
+        content=plan_text,
         importance=goal.priority,
         goal_id=goal.id,
     )
-    return result
+
+    # Return structured JSON so dispatch_one can extract follow_on_goals
+    return json.dumps({"plan": plan_text, "follow_on_goals": follow_on_goals})
 
 
 async def _skeptic_fn(goal, wm: SharedWorldModel) -> str:

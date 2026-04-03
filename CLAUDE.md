@@ -80,7 +80,7 @@ SharedWorldModel → GoalStack → Dispatcher → node.fn() → ConsensusEngine 
 
 - **SharedWorldModel** (`world_model.py`): all state lives here — beliefs, goals, events, node registry. asyncio.Lock on all writes. `_save_unlocked()` for internal callers holding the lock; `save()` for external callers.
 - **GoalStack** (`goal_stack.py`): interface over wm.goals. `push/complete/fail/decompose/llm_decompose`. Holds NO independent state — all reads from wm.
-- **Dispatcher** (`dispatcher.py`): `dispatch_one` returns `True` (success) / `False` (execution error) / `None` (no capable node — skipped). `dispatch_all` runs all eligible goals concurrently via asyncio.gather.
+- **Dispatcher** (`dispatcher.py`): `dispatch_one(goal, followon_budget=0)` returns `tuple[Optional[bool], int]` — `(True, n)` success with n follow-ons pushed / `(False, 0)` execution error / `(None, 0)` no capable node. `dispatch_all(followon_budget=0)` runs all eligible goals concurrently via asyncio.gather and returns `{"dispatched", "skipped", "failed", "followons_pushed"}`. **Any future work touching dispatch must account for the tuple return.**
 - **ConsensusEngine** (`consensus.py`): challenge/accept protocol. One evaluative node gets one veto round. Malformed evaluator response → accept with confidence=0.3. Goal exceeding max_retries → abandoned + escalation event.
 - **RunLoop** (`run_loop.py`): tick loop. `_run_strategist()` must execute before `_should_halt()` or gap goals never get pushed in short sessions.
 
@@ -110,6 +110,23 @@ SharedWorldModel → GoalStack → Dispatcher → node.fn() → ConsensusEngine 
 ## Belief injection
 
 `_planner_fn` uses `wm.retrieve_context(goal.description, top_k=3)` for belief context — relevance-filtered, not a full dump of all active beliefs. Dumping all beliefs causes anchoring on stale/irrelevant context (prior issue, fixed).
+
+## Node-initiated goals
+
+Planner node can push follow-on goals into the queue autonomously.
+
+**Priority ordering** (`world_model.py` `get_pending_goals`):
+`_SOURCE_PRIORITY = {"human": 3, "strategist": 2, "planner": 1}`. Sort key is `(source_priority, goal.priority)` descending. Unknown sources default to 1.
+
+**Planner output format** (`run_loop.py` `_planner_fn`, plan route only):
+Returns `json.dumps({"plan": str, "follow_on_goals": list[str]})`. Defensively parses LLM response — malformed JSON or missing keys fall back to `plan_text=raw, follow_on_goals=[]`. The `add_event` call logs `plan_text` (readable), not the JSON envelope.
+
+**Null plan guard:** `parsed.get("plan") or raw` — not `parsed.get("plan", raw)`. The LLM can return `{"plan": null}` (key present, value null), which `.get(key, default)` does not catch. The `or raw` fallback handles null, empty string, and missing key. Do not simplify this away.
+
+**Follow-on budget** (`run_loop.py` RunLoop):
+`MAX_PLANNER_FOLLOWONS_PER_TICK = 2` — module-level constant in `run_loop.py`, tunable. Not hardcoded behavior. Budget flows `tick() → dispatch_all(followon_budget) → dispatch_one(goal, followon_budget)`. `_tick_followon_count` resets to 0 at the top of each tick.
+
+**Goal source tagging:** Follow-on goals pushed with `source="planner"` via `gs.push()`. They rank below human (3) and strategist (2) goals automatically via source priority ordering.
 
 ## Bootstrap beliefs
 
@@ -143,9 +160,16 @@ And paste the output to establish where the last session ended.
 
 ## Current known gaps (as of last session)
 
-- Parent auto-completion via `_maybe_complete_parent()` — needs verification
-  it fires correctly when all siblings complete
-- Strategist gap goals — verify strategist still pushes correctly after
-  _planner_fn routing change (no strategist run since that commit)
-- Engineer and ethicist nodes — defined in prior sessions but need a live
-  run to confirm routing and output quality
+- Parent auto-completion via `_maybe_complete_parent()` — fires in live runs
+  (confirmed by clean shutdown with goals_done > 0) but has not been explicitly
+  traced to verify it fires on the correct sibling completion boundary
+- Follow-on goal quality — planner is now pushing follow-on goals (Task 4 live
+  run: 4 pushed across 2 ticks, cap hit twice) but their descriptions have not
+  been reviewed for capability keyword coverage; `skipped` dispatch events on
+  follow-on goals would indicate keyword mismatch
+
+**Verified this session:**
+
+- Strategist gap goals push correctly (3 strategist goals in Task 4 run)
+- Engineer routing confirmed working (11 planner-sourced goals routed and completed)
+- Ethicist routing — evaluative node, fires in consensus not dispatch; not separately verified

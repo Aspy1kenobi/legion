@@ -64,6 +64,7 @@ TICK_INTERVAL_ACTIVE = 2.0   # seconds — work is in progress, check frequently
 TICK_INTERVAL_IDLE   = 10.0  # seconds — queue empty, no point hammering wm
 
 MAX_DECOMPOSE_DEPTH  = 2     # max parent-chain depth before decomposition is blocked
+MAX_PLANNER_FOLLOWONS_PER_TICK = 2  # max follow-on goals planner can push per tick
 
 # Goals the strategist pushes when the queue empties.
 # Vocabulary is intentionally disjoint from planner capabilities
@@ -487,6 +488,7 @@ class RunLoop:
 
         self._running    = False
         self._tick_count = 0
+        self._tick_followon_count = 0  # follow-on goals pushed this tick; reset each tick
 
     # ── Startup ───────────────────────────────────────────────────────────────
 
@@ -533,14 +535,23 @@ class RunLoop:
         Returns the sleep interval to use before the next tick.
         """
         self._tick_count += 1
+        self._tick_followon_count = 0  # reset per-tick budget counter
         self._log(f"── Tick {self._tick_count} ──────────────────────")
 
         # Abandon orphaned goals before dispatching so they don't block siblings
         await self._abandon_orphaned_goals()
 
-        # Dispatch all eligible goals concurrently
-        dispatch_result = await self.dispatcher.dispatch_all()
+        # Dispatch all eligible goals concurrently, subject to follow-on budget
+        followon_budget = MAX_PLANNER_FOLLOWONS_PER_TICK - self._tick_followon_count
+        dispatch_result = await self.dispatcher.dispatch_all(followon_budget=followon_budget)
+        self._tick_followon_count += dispatch_result.get("followons_pushed", 0)
         self._log("Dispatch", dispatch_result)
+
+        if self._tick_followon_count >= MAX_PLANNER_FOLLOWONS_PER_TICK:
+            self._log(
+                f"Tick follow-on cap hit "
+                f"({self._tick_followon_count}/{MAX_PLANNER_FOLLOWONS_PER_TICK})"
+            )
 
         # Run consensus on any goals that completed this tick
         await self._run_consensus_on_completions()

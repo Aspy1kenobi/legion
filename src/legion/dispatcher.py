@@ -29,6 +29,7 @@ Async model:
 """
 
 import asyncio
+import json
 import traceback
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -174,14 +175,14 @@ class Dispatcher:
 
     # ── Execution ─────────────────────────────────────────────────────────────
 
-    async def dispatch_one(self, goal: "Goal") -> Optional[bool]:
+    async def dispatch_one(self, goal: "Goal", followon_budget: int = 0) -> tuple[Optional[bool], int]:
         """
         Full claim → execute → release cycle for a single goal.
 
         Returns:
-            True  — goal executed successfully
-            False — goal executed but raised an exception
-            None  — no capable idle node found; goal stays pending (skipped)
+            (True, n)   — goal executed successfully; n follow-on goals pushed
+            (False, 0)  — goal executed but raised an exception
+            (None, 0)   — no capable idle node found; goal stays pending (skipped)
 
         Never raises — all exceptions are caught, logged, and converted
         to goal failure events so run_loop.py stays alive.
@@ -197,15 +198,40 @@ class Dispatcher:
                 importance=0.3,
                 goal_id=goal.id,
             )
-            return None
+            return None, 0
 
         await self._claim(node, goal)
 
         try:
             result = await node.fn(goal, self.wm)
-            await self.gs.complete(goal.id, result=result, node_id=node.name)
+
+            # Defensive parse — works for planner JSON and plain-string outputs alike.
+            # Non-JSON results (engineer, skeptic, ethicist) silently fall back to
+            # plan_text=result, follow_on_goals=[], so non-planner nodes are unaffected.
+            try:
+                parsed = json.loads(result)
+                if not isinstance(parsed, dict):
+                    raise ValueError("not a dict")
+                plan_text = parsed.get("plan") or result
+                follow_on_goals = parsed.get("follow_on_goals", [])
+                if not isinstance(follow_on_goals, list):
+                    follow_on_goals = []
+            except (json.JSONDecodeError, ValueError):
+                plan_text = result
+                follow_on_goals = []
+
+            await self.gs.complete(goal.id, result=plan_text, node_id=node.name)
             await self._release(node, success=True)
-            return True
+
+            # Push follow-on goals up to the budget limit.
+            followons_pushed = 0
+            for desc in follow_on_goals:
+                if followons_pushed >= followon_budget:
+                    break
+                await self.gs.push(desc, source="planner")
+                followons_pushed += 1
+
+            return True, followons_pushed
 
         except Exception as e:
             reason = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
@@ -218,9 +244,9 @@ class Dispatcher:
                 importance=0.8,
                 goal_id=goal.id,
             )
-            return False
+            return False, 0
 
-    async def dispatch_all(self) -> dict:
+    async def dispatch_all(self, followon_budget: int = 0) -> dict:
         """
         Dispatch all currently eligible goals concurrently.
 
@@ -231,7 +257,7 @@ class Dispatcher:
         Goals that would exceed available nodes are left pending.
 
         Returns a summary dict for run_loop.py logging:
-            {"dispatched": int, "skipped": int, "failed": int}
+            {"dispatched": int, "skipped": int, "failed": int, "followons_pushed": int}
         """
         # Snapshot the eligible queue — don't mutate while iterating
         candidates = [
@@ -240,21 +266,23 @@ class Dispatcher:
         ]
 
         if not candidates:
-            return {"dispatched": 0, "skipped": 0, "failed": 0}
+            return {"dispatched": 0, "skipped": 0, "failed": 0, "followons_pushed": 0}
 
         results = await asyncio.gather(
-            *[self.dispatch_one(goal) for goal in candidates],
+            *[self.dispatch_one(goal, followon_budget) for goal in candidates],
             return_exceptions=False,  # exceptions handled inside dispatch_one
         )
 
-        dispatched = sum(1 for r in results if r is True)
-        failed     = sum(1 for r in results if r is False)
-        skipped    = sum(1 for r in results if r is None)
+        dispatched       = sum(1 for r, _ in results if r is True)
+        failed           = sum(1 for r, _ in results if r is False)
+        skipped          = sum(1 for r, _ in results if r is None)
+        followons_pushed = sum(n for _, n in results)
 
         return {
-            "dispatched": dispatched,
-            "skipped":    skipped,
-            "failed":     failed,
+            "dispatched":       dispatched,
+            "skipped":          skipped,
+            "failed":           failed,
+            "followons_pushed": followons_pushed,
         }
 
     # ── Introspection ─────────────────────────────────────────────────────────

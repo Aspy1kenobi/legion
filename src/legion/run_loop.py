@@ -207,7 +207,7 @@ async def _planner_fn(goal, wm: SharedWorldModel) -> str:
         parsed = json.loads(raw)
         if not isinstance(parsed, dict):
             raise ValueError("not a dict")
-        plan_text = parsed.get("plan", raw)
+        plan_text = parsed.get("plan") or raw
         follow_on_goals = parsed.get("follow_on_goals", [])
         if not isinstance(follow_on_goals, list):
             follow_on_goals = []

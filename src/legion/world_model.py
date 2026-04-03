@@ -101,6 +101,15 @@ class NodeRecord:
     current_goal_id: Optional[str] = None  # goal currently assigned to this node
 
 
+# Source priority for goal ordering. Higher number = dispatched first.
+# Unknown sources default to 1 (same as planner).
+_SOURCE_PRIORITY: dict[str, int] = {
+    "human":      3,
+    "strategist": 2,
+    "planner":    1,
+}
+
+
 # ── World Model ───────────────────────────────────────────────────────────────
 
 class SharedWorldModel:
@@ -439,7 +448,7 @@ class SharedWorldModel:
             await self._save_unlocked()
 
     def get_pending_goals(self) -> list[Goal]:
-        """Goals ready to work on, sorted by priority. Used by GoalStack."""
+        """Goals ready to work on, sorted by source priority then goal priority. Used by GoalStack."""
         ready = [
             g for g in self.goals.values()
             if g.status == "pending"
@@ -448,7 +457,11 @@ class SharedWorldModel:
                 for dep in g.depends_on
             )
         ]
-        return sorted(ready, key=lambda g: g.priority, reverse=True)
+        return sorted(
+            ready,
+            key=lambda g: (_SOURCE_PRIORITY.get(g.source, 1), g.priority),
+            reverse=True,
+        )
 
     # ── Introspection ─────────────────────────────────────────────────────────
 

@@ -109,7 +109,13 @@ SharedWorldModel → GoalStack → Dispatcher → node.fn() → ConsensusEngine 
 
 ## Belief injection
 
-`_planner_fn` uses `wm.retrieve_context(goal.description, top_k=3)` for belief context — relevance-filtered, not a full dump of all active beliefs. Dumping all beliefs causes anchoring on stale/irrelevant context (prior issue, fixed).
+`_planner_fn` uses `wm.retrieve_context(goal.description, top_k=MAX_BELIEF_INJECTION)` (constant = 3) for belief context — recency+importance+relevance scored, not a full dump of active beliefs. Verified: baseline comparison showed the old word-overlap sort pulled off-topic bootstrap beliefs (debate_async.py, coverage metrics); `retrieve_context` pulls the actual belief commitment and goal completion events for the same goal. `MAX_BELIEF_INJECTION = 3` is a tunable module-level constant in `run_loop.py`.
+
+## Context budget cap
+
+`format_context_for_prompt(query, top_k, agent_filter, max_chars=4000)` in `world_model.py`. Truncation cuts at clean event boundaries — never mid-event. When truncation occurs: appends `[context truncated: N of M events omitted — budget X chars]` to the return value and prints `[Legion WARNING]` to stdout. `max_chars` budgets only the event content; the notice itself adds ~80 chars beyond that. Pass `max_chars=0` to disable. Edge case: first event exceeds budget → include it truncated with `…` appended.
+
+In a short 3-tick run the cap fires on engineer output (2700+ char responses push past 4000 when combined). This is correct behavior — the warning is signal, not noise.
 
 ## Node-initiated goals
 
@@ -173,3 +179,5 @@ And paste the output to establish where the last session ended.
 - Strategist gap goals push correctly (3 strategist goals in Task 4 run)
 - Engineer routing confirmed working (11 planner-sourced goals routed and completed)
 - Ethicist routing — evaluative node, fires in consensus not dispatch; not separately verified
+- Belief injection relevance: `retrieve_context` vs word-overlap — before/after baseline confirmed retrieve_context is strictly more relevant (all 3 items on-topic; baseline had off-topic items)
+- Context budget cap fires correctly in live run (engineer output ~2700 chars triggers it at 4000-char budget)

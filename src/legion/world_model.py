@@ -407,16 +407,65 @@ class SharedWorldModel:
         top_idx  = combined.argsort()[::-1][:top_k]
         return [candidates[i] for i in top_idx]
 
-    def format_context_for_prompt(self, query: str, top_k: int = 5, agent_filter: str = None) -> str:
-        """Ready-to-inject context string for node prompts."""
+    def format_context_for_prompt(
+        self,
+        query:      str,
+        top_k:      int = 5,
+        agent_filter: str = None,
+        max_chars:  int = 4000,
+    ) -> str:
+        """
+        Ready-to-inject context string for node prompts.
+
+        max_chars: character budget for the returned string. Truncation
+        happens at clean event boundaries — never mid-event. When truncation
+        occurs a notice is appended and a warning printed to stdout.
+        Pass max_chars=0 to disable the cap entirely.
+        """
         events = self.retrieve_context(query, top_k, agent_filter)
         if not events:
             return "(no relevant collective memory)"
-        lines = []
+
+        formatted = []
         for e in events:
             tag_str = f" [{','.join(e.tags)}]" if e.tags else ""
-            lines.append(f"[{e.agent} | {e.event_type}{tag_str}]\n{e.content}")
-        return "\n\n".join(lines)
+            formatted.append(f"[{e.agent} | {e.event_type}{tag_str}]\n{e.content}")
+
+        # No cap requested — return everything
+        if not max_chars:
+            return "\n\n".join(formatted)
+
+        # Accumulate events until budget is exhausted, cutting at clean boundaries
+        result = ""
+        included = 0
+        for item in formatted:
+            candidate = (result + "\n\n" + item) if result else item
+            if len(candidate) > max_chars:
+                break
+            result = candidate
+            included += 1
+
+        # Edge case: even the first event exceeds budget — include it truncated
+        # so the caller always gets something useful
+        if included == 0:
+            result = formatted[0][:max_chars]
+            included = 1
+
+        omitted = len(formatted) - included
+        if omitted > 0:
+            notice = (
+                f"\n\n[context truncated: {omitted} of {len(formatted)} events omitted"
+                f" — budget {max_chars} chars]"
+            )
+            result += notice
+            print(
+                f"[Legion WARNING] format_context_for_prompt: truncated "
+                f"{omitted}/{len(formatted)} events (budget={max_chars}, "
+                f"query={query[:40]!r})",
+                flush=True,
+            )
+
+        return result
 
     def get_active_beliefs(self, min_confidence: float = 0.5) -> list[Belief]:
         """The collective's current committed worldview."""

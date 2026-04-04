@@ -417,10 +417,10 @@ class SharedWorldModel:
         """
         Ready-to-inject context string for node prompts.
 
-        max_chars: character budget for the returned string. Truncation
-        happens at clean event boundaries — never mid-event. When truncation
-        occurs a notice is appended and a warning printed to stdout.
-        Pass max_chars=0 to disable the cap entirely.
+        max_chars: character budget for the event content in the returned string.
+        Truncation happens at clean event boundaries — never mid-event. When
+        truncation occurs a short notice (~80 chars) is appended beyond the budget
+        and a warning is printed to stdout. Pass max_chars=0 to disable the cap.
         """
         events = self.retrieve_context(query, top_k, agent_filter)
         if not events:
@@ -448,7 +448,7 @@ class SharedWorldModel:
         # Edge case: even the first event exceeds budget — include it truncated
         # so the caller always gets something useful
         if included == 0:
-            result = formatted[0][:max_chars]
+            result = formatted[0][:max_chars] + "…"
             included = 1
 
         omitted = len(formatted) - included

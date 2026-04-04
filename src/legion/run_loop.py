@@ -65,6 +65,7 @@ TICK_INTERVAL_IDLE   = 10.0  # seconds — queue empty, no point hammering wm
 
 MAX_DECOMPOSE_DEPTH  = 2     # max parent-chain depth before decomposition is blocked
 MAX_PLANNER_FOLLOWONS_PER_TICK = 2  # max follow-on goals planner can push per tick
+MAX_BELIEF_INJECTION = 3     # max context events injected into planner prompt
 
 # Goals the strategist pushes when the queue empties.
 # Vocabulary is intentionally disjoint from planner capabilities
@@ -155,15 +156,13 @@ async def _planner_fn(goal, wm: SharedWorldModel) -> str:
     # Episodic context: recent events relevant to this goal
     event_context = wm.format_context_for_prompt(goal.description, top_k=4)
 
-    # Belief context: committed facts filtered by relevance to the goal.
-    desc_words = set(goal.description.lower().split())
-    all_beliefs = wm.get_active_beliefs(min_confidence=0.5)
-    def _belief_relevance(b):
-        b_words = set(b.content.lower().split())
-        return len(b_words & desc_words)
-    ranked_beliefs = sorted(all_beliefs, key=_belief_relevance, reverse=True)
-    top_beliefs = ranked_beliefs[:5]
-    belief_str = "\n".join(f"- {b.content}" for b in top_beliefs) or "(none yet)"
+    # Belief context: relevance-filtered via retrieve_context (recency + importance
+    # + relevance). Mirrors the engineer pattern — avoids full belief dump and
+    # the anchoring problem from injecting all high-confidence beliefs.
+    relevant_context = wm.retrieve_context(goal.description, top_k=MAX_BELIEF_INJECTION)
+    belief_str = "\n".join(
+        f"- [{e.agent}] {e.content[:200]}" for e in relevant_context
+    ) or "(none yet)"
 
     messages = [
         {
@@ -188,7 +187,7 @@ async def _planner_fn(goal, wm: SharedWorldModel) -> str:
             "role": "user",
             "content": (
                 f"GOAL: {goal.description}\n\n"
-                f"RELEVANT COLLECTIVE BELIEFS (committed facts about this system):\n"
+                f"RELEVANT COLLECTIVE CONTEXT (recent events and beliefs relevant to this goal):\n"
                 f"{belief_str}\n\n"
                 f"RECENT COLLECTIVE ACTIVITY:\n{event_context or '(none yet)'}\n\n"
                 "Produce a concrete analysis or plan to accomplish this goal. "

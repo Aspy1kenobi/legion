@@ -502,6 +502,22 @@ class RunLoop:
         belief_count = await bootstrap_beliefs(self.wm)
         self._log(f"Bootstrap complete", f"{belief_count} beliefs seeded")
 
+        # 1a. Startup cleanup: delete stale retry_count_* beliefs from prior sessions.
+        # These accumulate when a session ends between rejection and the final abandonment
+        # that would normally trigger delete_belief() in _reject(). Catch them here so
+        # long-running sessions start clean.
+        stale_keys = [
+            k for k, _ in self.wm.beliefs.items()
+            if k.startswith("retry_count_")
+            and (
+                k[len("retry_count_"):] not in self.wm.goals
+                or self.wm.goals[k[len("retry_count_"):]].status == "abandoned"
+            )
+        ]
+        for k in stale_keys:
+            await self.wm.delete_belief(k)
+        if stale_keys:
+            self._log(f"Startup cleanup: deleted {len(stale_keys)} stale retry counter(s)")
 
         # 2. Goal stack
         self.gs = GoalStack(self.wm)

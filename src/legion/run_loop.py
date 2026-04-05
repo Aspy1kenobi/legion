@@ -684,6 +684,10 @@ class RunLoop:
                         goal_id=goal.id,
                     )
                     self._log(f"Orphan abandoned: {goal.id}")
+                    # Check if this was the last non-terminal sibling — if so,
+                    # auto-complete the parent. Without this, a cascade failure
+                    # (dep abandoned → orphan abandoned) leaves the parent stuck.
+                    await self.gs._maybe_complete_parent(goal.id, "run_loop")
                     break
 
     def _goal_depth(self, goal_id: str) -> int:

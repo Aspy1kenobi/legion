@@ -192,13 +192,42 @@ class GoalStack:
 
     async def _maybe_complete_parent(self, child_id: str, node_id: str) -> None:
         """
-        If the just-completed goal has a parent, check whether all siblings
-        are in a terminal state (complete or abandoned). If so, mark the parent
-        complete and recurse upward to handle nested decompositions.
+        Auto-complete a parent goal when all its children reach a terminal state.
 
-        Called automatically from complete() — never needs to be called directly.
-        The sibling walk is O(goals) but goals are bounded and this fires only
-        at natural completion moments, not on every tick.
+        Trigger condition:
+            All siblings (goals sharing the same parent_id) must be in
+            {"complete", "abandoned"}. A mix of complete and abandoned
+            satisfies the condition — an abandoned sibling means that branch
+            is done, not stuck. Any sibling in pending or active blocks the
+            check.
+
+        Parent guard:
+            The parent must exist and have status "active". A parent that is
+            already "complete" or "abandoned" is left untouched (prevents
+            double-completion on re-entrant calls during recursion).
+
+        Trigger paths (MUST stay in sync with this docstring):
+            - complete()            — fires for every successful goal completion
+            - fail()                — fires when a goal is abandoned via dispatcher
+                                      failure; needed so an abandoned last-sibling
+                                      can still close its parent
+            - _abandon_orphaned_goals() — fires when run_loop.py cascades a
+                                          dependency failure; same reason
+
+        The consensus abandonment path (ConsensusEngine._reject() calling
+        wm.update_goal_status("abandoned") directly) does NOT fire this method.
+        In that path the next tick's _abandon_orphaned_goals() will catch
+        dependent children, which will then trigger this via the orphan path.
+
+        Recursion:
+            After completing a parent, recurse upward so grandparents are
+            auto-completed in the same call chain. Depth is bounded by
+            MAX_DECOMPOSE_DEPTH (typically 2), so stack growth is minimal.
+
+        Called automatically — never needs to be called directly by callers
+        outside GoalStack or RunLoop. The sibling walk is O(goals) but goals
+        are bounded and this fires only at natural completion/failure moments,
+        not on every tick.
         """
         child = self.wm.goals.get(child_id)
         if child is None or child.parent_id is None:
@@ -253,6 +282,9 @@ class GoalStack:
             importance=goal.priority,
             goal_id=goal_id,
         )
+        # If this goal has a parent, check whether all siblings are now terminal.
+        # Without this call an abandoned last-sibling leaves the parent stuck active.
+        await self._maybe_complete_parent(goal_id, node_id)
 
     async def decompose(
         self,

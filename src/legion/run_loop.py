@@ -201,18 +201,33 @@ async def _planner_fn(goal, wm: SharedWorldModel) -> str:
 
     raw, _ = await call_llm(messages, config)
 
+    # Fence-strip: some models (llama3.2, mistral) wrap JSON in markdown fences.
+    # Strip before parsing so the fallback isn't silently triggered by fences.
+    # json.loads("```json\n{...}\n```") raises JSONDecodeError — fences mean the
+    # plan_text fallback would contain raw backticks, which is not a parse success.
+    result = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+
     # Defensive parse — malformed or missing keys fall back gracefully.
     # Goal completion must never be blocked by a parse failure.
+    # On parse failure: log a parse_error event (visible in wm for inspection),
+    # preserve the raw text as plan_text, and drop follow-on goals.
     try:
-        parsed = json.loads(raw)
+        parsed = json.loads(result)
         if not isinstance(parsed, dict):
             raise ValueError("not a dict")
-        plan_text = parsed.get("plan") or raw
+        plan_text = parsed.get("plan") or result
         follow_on_goals = parsed.get("follow_on_goals", [])
         if not isinstance(follow_on_goals, list):
             follow_on_goals = []
     except (json.JSONDecodeError, ValueError):
-        plan_text = raw
+        await wm.add_event(
+            agent="planner",
+            event_type="parse_error",
+            content=f"Planner JSON parse failed. Raw output:\n{result[:500]}",
+            importance=0.8,
+            goal_id=goal.id,
+        )
+        plan_text = result
         follow_on_goals = []
 
     # Log the readable plan text, not the raw JSON envelope

@@ -419,16 +419,27 @@ def _build_default_nodes() -> list[LegionNode]:
         LegionNode(
             name="planner",
             role_type="procedural",
-            # Strategic verbs only — no execution vocabulary
-            capabilities=["plan", "decompose", "analyze", "design", "define", "structure"],
+            # Strategic verbs only — no execution vocabulary.
+            # "establish" added: planner emits goals like "Establish a trust model / knowledge
+            #   graph" — setup/definition class, same family as "define"/"structure".
+            # "refine" added: planner emits goals like "Refine consensus proposal based on
+            #   findings" — strategic iteration verb, same family as "design".
+            # Spotted via can_handle() coverage check against sampled follow-on goals (2026-04-06).
+            capabilities=["plan", "decompose", "analyze", "design", "define", "structure",
+                          "establish", "refine"],
             fn=_planner_fn,
         ),
         LegionNode(
             name="engineer",
             role_type="procedural",
-            # Execution verbs only — disjoint from planner
+            # Execution verbs only — disjoint from planner.
+            # "refactor" added: planner emits goals like "Refactor the dispatcher" —
+            #   execution verb, same family as "build"/"implement".
+            # "integrate" added: planner emits goals like "Integrate the trust model" —
+            #   execution verb, clearly implementation work.
+            # Spotted via can_handle() coverage check against sampled follow-on goals (2026-04-06).
             capabilities=["implement", "build", "code", "write", "create",
-                          "develop", "construct", "generate"],
+                          "develop", "construct", "generate", "refactor", "integrate"],
             fn=_engineer_fn,
         ),
         LegionNode(
